@@ -5,6 +5,7 @@
   jr show <slug>   показать verdict и черновик ответа без пересчёта
   jr ls            список вакансий
   jr scan <url>    пул с justjoin.it (до 50, пауза 2 с) -> jobs/_pool/<дата>/pool.md, index.csv не меняется
+  jr map [дата]    карта пула -> jobs/_pool/<дата>/map.html (Fit × Job, города, черновики ответов)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
@@ -15,7 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import fx, pipeline, scan, tracker
+from . import fx, pipeline, poolmap, scan, tracker
 from .config import ROOT, ConfigError
 from .extract import extract
 from .normalize import normalize
@@ -90,7 +91,11 @@ def main(argv: list[str] | None = None) -> int:
         elif args[:1] == ["ls"]:
             ls()
         elif args[:1] == ["scan"] and len(args) == 2:
-            print(f"Готово: {scan.scan(args[1], fx.get_rates(), index_path=INDEX)}")
+            md = scan.scan(args[1], fx.get_rates(), index_path=INDEX)
+            print(f"Готово: {md}\nКарта: {poolmap.render(md.parent)}")
+        elif args[:1] == ["map"] and len(args) <= 2:
+            out = poolmap.render(scan.POOL / args[1] if len(args) == 2 else None)
+            print(f"Карта: {out}\nОткрыть в Windows: explorer.exe \"$(wslpath -w {out})\"")
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
             show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))

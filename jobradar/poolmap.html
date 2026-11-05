@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта вакансий</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e2dc; --grid: #ecebe6;
+  --apply: #1f8a5b; --clarify: #c98a12; --skip: #a8a8a2; --dup: #7d6bb3; --scam: #c0392b;
+  --accent: #2f5fd0; --zone: rgba(31, 138, 91, .07); --shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #34332f; --grid: #2a2a27;
+  --apply: #3cc48a; --clarify: #e3a93a; --skip: #6b6b66; --dup: #a593e0; --scam: #e8675a;
+  --accent: #7ea0ff; --zone: rgba(60, 196, 138, .09); --shadow: none;
+}}
+:root[data-theme="dark"] {
+  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #34332f; --grid: #2a2a27;
+  --apply: #3cc48a; --clarify: #e3a93a; --skip: #6b6b66; --dup: #a593e0; --scam: #e8675a;
+  --accent: #7ea0ff; --zone: rgba(60, 196, 138, .09); --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+h1 { font-size: 18px; margin: 0; }
+.muted { color: var(--muted); }
+.tabs { display: flex; gap: 4px; }
+.tabs button, .chip, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.controls { padding: 0 16px 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip[aria-pressed="false"] { opacity: .45; }
+.chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+input[type=search] { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
+  padding: 5px 8px; font: inherit; min-width: 160px; }
+main { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; padding: 0 16px 24px; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.chart { padding: 8px; }
+svg { width: 100%; height: auto; display: block; }
+svg text { fill: var(--muted); font-size: 11px; }
+.dot { cursor: pointer; stroke: var(--panel); stroke-width: 1.5; }
+.dot.sel { stroke: var(--ink); stroke-width: 2.5; }
+.dot.star { stroke: var(--accent); stroke-width: 2.5; }
+.list { max-height: 420px; overflow: auto; border-top: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; padding: 7px 10px;
+  border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+.row:hover, .row.sel { background: var(--grid); }
+.row .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .n { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.star-btn { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 0; }
+.star-btn.on { color: var(--accent); }
+.detail { padding: 14px 16px; position: sticky; top: 8px; align-self: start; max-height: calc(100vh - 16px); overflow: auto; }
+.detail h2 { font-size: 16px; margin: 0 0 4px; }
+.kv { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; background: var(--grid); }
+.pill.d { color: #fff; }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--grid); padding: 10px; border-radius: 8px;
+  font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 6px 0 0; }
+textarea { width: 100%; min-height: 220px; background: var(--grid); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px; font: 13px/1.45 ui-monospace, Menlo, monospace; }
+details { margin-top: 10px; }
+summary { cursor: pointer; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+a { color: var(--accent); }
+.short { padding: 10px 16px; }
+.empty { padding: 30px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Карта вакансий</h1>
+  <span class="muted" id="meta"></span>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="fit">Fit × Job</button>
+    <button role="tab" aria-selected="false" data-tab="geo">Города</button>
+  </div>
+</header>
+<div class="controls" id="controls"></div>
+<main>
+  <section class="card">
+    <div class="chart" id="chart"></div>
+    <div class="list" id="list"></div>
+  </section>
+  <aside class="card detail" id="detail"><div class="empty">Выбери точку или строку</div></aside>
+</main>
+<section class="card short" style="margin: 0 16px 24px" id="short"></section>
+
+<script>
+const DATA = /*DATA*/null;
+const DEC = { apply: "var(--apply)", clarify: "var(--clarify)", skip: "var(--skip)", duplicate: "var(--dup)", stop_scam: "var(--scam)" };
+const DEC_RU = { apply: "подаваться", clarify: "уточнить", skip: "пропустить", duplicate: "дубль", stop_scam: "скам" };
+const TARGET_H = 1500 / 8;   // цель 1500 PLN/день
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const state = { tab: "fit", dec: new Set(["apply", "clarify"]), q: "", rateOk: false, city: null, sel: null,
+                stars: new Set(store.get("jr-stars-" + DATA.date, [])) };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const mid = r => r.rate ? (r.rate[0] + r.rate[1]) / 2 : null;
+const rateTxt = r => r.rate ? `${Math.round(r.rate[0])}–${Math.round(r.rate[1])} PLN/ч` : "ставка ?";
+const ORDER = { apply: 0, clarify: 1, skip: 2, duplicate: 3, stop_scam: 4 };
+
+function visible() {
+  const q = state.q.toLowerCase();
+  return DATA.rows.filter(r => state.dec.has(r.decision)
+    && (!q || (r.company + " " + r.role + " " + r.why).toLowerCase().includes(q))
+    && (!state.rateOk || (r.rate && r.rate[1] >= TARGET_H))
+    && (!state.city || r.city === state.city))
+    .sort((a, b) => ORDER[a.decision] - ORDER[b.decision] || b.fit - a.fit || (b.job ?? -1) - (a.job ?? -1));
+}
+
+function controls() {
+  const n = d => DATA.rows.filter(r => r.decision === d).length;
+  $("#controls").innerHTML = Object.keys(DEC).filter(n).map(d =>
+    `<button class="chip" data-dec="${d}" aria-pressed="${state.dec.has(d)}"><i style="background:${DEC[d]}"></i>${DEC_RU[d]} ${n(d)}</button>`).join("")
+    + `<button class="chip" id="rate" aria-pressed="${state.rateOk}">верх ставки ≥ 1500/день</button>`
+    + `<input type="search" id="q" placeholder="поиск: компания, роль, стек" value="${esc(state.q)}">`
+    + (state.city ? `<button class="chip" id="city">город: ${esc(state.city)} ✕</button>` : "");
+  document.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => {
+    state.dec.has(b.dataset.dec) ? state.dec.delete(b.dataset.dec) : state.dec.add(b.dataset.dec); draw(); });
+  $("#rate").onclick = () => { state.rateOk = !state.rateOk; draw(); };
+  $("#q").oninput = e => { state.q = e.target.value; drawBody(); };
+  if ($("#city")) $("#city").onclick = () => { state.city = null; draw(); };
+}
+
+function fitChart(rows) {
+  const W = 640, H = 440, L = 40, R = 12, T = 12, B = 70, NA = 30;     // нижняя полоса — job н/д
+  const x = v => L + v / 100 * (W - L - R), y = v => T + (100 - v) / 100 * (H - T - B - NA);
+  const rMax = Math.max(...DATA.rows.map(mid).filter(Boolean), 1);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fit по горизонтали, Job по вертикали">`;
+  s += `<rect x="${x(70)}" y="${y(100)}" width="${x(100) - x(70)}" height="${y(60) - y(100)}" fill="var(--zone)"/>`;
+  s += `<text x="${x(100) - 4}" y="${y(60) - 6}" text-anchor="end">зона apply: fit ≥ 70, job ≥ 60</text>`;
+  for (const v of [0, 25, 50, 75, 100]) {
+    s += `<line x1="${x(v)}" x2="${x(v)}" y1="${y(100)}" y2="${y(0)}" stroke="var(--grid)"/>`
+       + `<text x="${x(v)}" y="${H - B + NA + 16}" text-anchor="middle">${v}</text>`
+       + `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/>`
+       + `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  }
+  s += `<text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle">fit — насколько подходишь →</text>`
+     + `<text x="12" y="${y(50)}" transform="rotate(-90 12 ${y(50)})" text-anchor="middle">job — ставка и условия →</text>`
+     + `<text x="${L - 6}" y="${H - B + 4}" text-anchor="end">н/д</text>`
+     + `<line x1="${L}" x2="${W - R}" y1="${H - B - NA / 2 + 6}" y2="${H - B - NA / 2 + 6}" stroke="var(--grid)" stroke-dasharray="3 3"/>`;
+  rows.forEach((r, i) => {
+    const cy = r.job == null ? H - B + (i % 3) * 5 - 5 : y(r.job);
+    const cx = x(r.fit) + ((i * 7) % 5 - 2);                        // лёгкий разнос совпадающих точек
+    const rad = 5 + (mid(r) ? 7 * mid(r) / rMax : 0);
+    const cls = ["dot", state.sel === r.slug && "sel", state.stars.has(r.slug) && "star"].filter(Boolean).join(" ");
+    s += `<circle class="${cls}" data-slug="${r.slug}" cx="${cx}" cy="${cy}" r="${rad.toFixed(1)}" fill="${DEC[r.decision]}" fill-opacity=".85">`
+       + `<title>${esc(r.company)} — ${esc(r.role)}\nfit ${r.fit} · job ${r.job ?? "н/д"} · ${rateTxt(r)}</title></circle>`;
+  });
+  return s + `</svg><div class="muted" style="padding:0 6px 6px">Размер точки — ставка. Синяя обводка — в шортлисте.</div>`;
+}
+
+const PL = [[14.2,53.9],[16.0,54.25],[17.0,54.7],[18.4,54.8],[19.6,54.45],[22.8,54.36],[23.5,54.0],[23.9,53.0],
+  [23.6,52.6],[23.2,52.2],[23.7,51.6],[24.1,50.8],[23.4,50.4],[22.6,49.5],[22.0,49.2],[20.9,49.3],[19.8,49.2],
+  [19.0,49.4],[18.6,49.9],[17.7,50.1],[16.9,50.4],[16.3,50.7],[15.0,51.0],[14.8,51.6],[14.6,52.0],[14.1,52.8],[14.4,53.3]];
+
+function geoChart(rows) {
+  const W = 640, H = 560, k = Math.cos(52 * Math.PI / 180), s0 = 64;
+  const px = ([lo, la]) => [30 + (lo - 14) * k * s0 * 1.55, 20 + (55 - la) * s0 * 1.55 * .9];
+  const all = DATA.rows.filter(r => state.dec.has(r.decision));
+  const by = {};
+  all.forEach(r => { (by[r.city || "?"] ||= []).push(r); });
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Схема Польши с городами вакансий">`
+        + `<polygon points="${PL.map(p => px(p).join(",")).join(" ")}" fill="var(--grid)" stroke="var(--line)"/>`;
+  const home = DATA.cities[DATA.home];
+  if (home) { const [hx, hy] = px(home);
+    s += `<rect x="${hx - 6}" y="${hy - 6}" width="12" height="12" fill="none" stroke="var(--accent)" stroke-width="2"/>`
+       + `<text x="${hx}" y="${hy + 22}" text-anchor="middle" style="fill:var(--accent)">дом: ${esc(DATA.home)}</text>`; }
+  const other = [];
+  Object.entries(by).forEach(([city, rs]) => {
+    const c = DATA.cities[city]; if (!c) { other.push([city, rs.length]); return; }
+    const [cx, cy] = px(c), best = rs.map(r => r.decision).sort((a, b) => ORDER[a] - ORDER[b])[0];
+    const hyb = rs.filter(r => r.remote !== "full").length;
+    s += `<circle class="dot ${state.city === city ? "sel" : ""}" data-city="${esc(city)}" cx="${cx}" cy="${cy}" r="${8 + Math.sqrt(rs.length) * 5}" fill="${DEC[best]}" fill-opacity=".75">`
+       + `<title>${esc(city)}: ${rs.length} вак.${hyb ? `, гибрид/офис ${hyb}` : ""}</title></circle>`
+       + `<text x="${cx}" y="${cy + 4}" text-anchor="middle" style="fill:var(--ink);font-weight:600;pointer-events:none">${rs.length}</text>`
+       + `<text x="${cx}" y="${cy - 14 - Math.sqrt(rs.length) * 5}" text-anchor="middle">${esc(city)}${hyb ? ` · офис ${hyb}` : ""}</text>`;
+  });
+  s += `</svg><div class="muted" style="padding:0 6px 6px">Схема, не масштабная карта. Цвет — лучшее решение в городе; клик — фильтр по городу.`
+     + ` Почти все вакансии remote: город важен только для «офис N».${other.length ? " Без города: " + other.map(([c, n]) => `${esc(c)} ${n}`).join(", ") : ""}</div>`;
+  return s;
+}
+
+function list(rows) {
+  if (!rows.length) return `<div class="empty">Ничего не подходит под фильтры</div>`;
+  return rows.map(r => `<div class="row ${state.sel === r.slug ? "sel" : ""}" data-slug="${r.slug}">
+    <button class="star-btn ${state.stars.has(r.slug) ? "on" : ""}" data-star="${r.slug}" title="в шортлист">${state.stars.has(r.slug) ? "★" : "☆"}</button>
+    <div class="t"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i><b>${esc(r.company)}</b> — ${esc(r.role)}</div>
+    <div class="n">fit ${r.fit} · job ${r.job ?? "н/д"} · ${rateTxt(r)}</div></div>`).join("");
+}
+
+function copy(text, btn) {
+  const done = () => { const t = btn.textContent; btn.textContent = "скопировано"; setTimeout(() => btn.textContent = t, 1200); };
+  navigator.clipboard?.writeText(text).then(done, () => { prompt("Скопируй:", text); });
+}
+
+function detail() {
+  const r = DATA.rows.find(x => x.slug === state.sel);
+  if (!r) { $("#detail").innerHTML = `<div class="empty">Выбери точку или строку</div>`; return; }
+  const place = r.remote === "full" ? "remote" : `${r.remote}${r.onsite_days ? `, офис ${r.onsite_days} д/нед` : ""}`;
+  $("#detail").innerHTML = `
+    <h2>${esc(r.role)}</h2><div><b>${esc(r.company)}</b> · ${esc(r.city || "?")} · ${esc(place)}${r.km != null && r.remote !== "full" ? ` · ${r.km} км от дома` : ""}</div>
+    <div class="kv"><span class="pill d" style="background:${DEC[r.decision]}">${DEC_RU[r.decision]}</span>
+      <span class="pill">fit ${r.fit}</span><span class="pill">job ${r.job ?? "н/д"}</span><span class="pill">${rateTxt(r)}</span>
+      ${r.rate ? `<span class="pill">≈ ${Math.round(r.rate[0] * 8)}–${Math.round(r.rate[1] * 8)} PLN/день</span>` : ""}</div>
+    ${r.money_note ? `<div>💰 ${esc(r.money_note)}</div>` : ""}
+    <div style="margin-top:6px">🧩 ${esc(r.why)}</div>
+    ${r.risks.length ? `<div style="margin-top:6px">⚠️ ${r.risks.map(esc).join(", ")}</div>` : ""}
+    <div style="margin-top:6px" class="muted">Причина решения: ${esc(r.reason)}</div>
+    <div class="actions">
+      <a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener">открыть вакансию</a>
+      <button class="btn" id="cp-take">копировать: jr take</button>
+      <button class="btn" id="cp-eval">копировать: /job-eval</button>
+      <button class="btn" id="st">${state.stars.has(r.slug) ? "★ в шортлисте" : "☆ в шортлист"}</button>
+    </div>
+    ${r.call_notes.length ? `<details open><summary>Спросить на звонке</summary><ul>${r.call_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
+    ${r.reply ? `<details open><summary>Черновик ответа (шаблон ${esc(r.template)})</summary>
+      <div class="muted">Места [...] дописывает /job-eval после research. Отправляешь сам.</div>
+      <textarea id="reply">${esc(r.reply)}</textarea><div class="actions"><button class="btn" id="cp-reply">копировать ответ</button></div></details>`
+      : `<div class="muted" style="margin-top:8px">Ответ не нужен (${esc(r.decision)}).</div>`}
+    <details><summary>Вердикт целиком</summary><pre>${esc(r.verdict)}</pre></details>`;
+  $("#cp-take").onclick = e => copy(`jr take ${r.slug}`, e.target);
+  $("#cp-eval").onclick = e => copy(`/job-eval ${r.slug}`, e.target);
+  $("#st").onclick = () => toggleStar(r.slug);
+  if ($("#cp-reply")) $("#cp-reply").onclick = e => copy($("#reply").value, e.target);
+}
+
+function shortlist() {
+  const rs = DATA.rows.filter(r => state.stars.has(r.slug));
+  $("#short").innerHTML = `<b>Шортлист (${rs.length})</b> <span class="muted">— отметь ☆ и скопируй команды в терминал</span>`
+    + (rs.length ? `<pre>${rs.map(r => `jr take ${r.slug}`).join("\n")}</pre><div class="actions"><button class="btn" id="cp-all">копировать все команды</button></div>` : "");
+  if ($("#cp-all")) $("#cp-all").onclick = e => copy(rs.map(r => `jr take ${r.slug}`).join("\n"), e.target);
+}
+
+function toggleStar(slug) {
+  state.stars.has(slug) ? state.stars.delete(slug) : state.stars.add(slug);
+  store.set("jr-stars-" + DATA.date, [...state.stars]); drawBody();
+}
+
+function drawBody() {
+  const rows = visible();
+  $("#chart").innerHTML = state.tab === "fit" ? fitChart(rows) : geoChart(rows);
+  $("#list").innerHTML = list(rows);
+  document.querySelectorAll("[data-slug]").forEach(el => el.onclick = e => {
+    if (e.target.dataset.star) return; state.sel = el.dataset.slug; drawBody(); });
+  document.querySelectorAll("[data-star]").forEach(b => b.onclick = () => toggleStar(b.dataset.star));
+  document.querySelectorAll("[data-city]").forEach(el => el.onclick = () => {
+    state.city = state.city === el.dataset.city ? null : el.dataset.city; draw(); });
+  detail(); shortlist();
+}
+function draw() { controls(); drawBody(); }
+
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+  state.tab = b.dataset.tab;
+  document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x === b));
+  drawBody();
+});
+if (location.hash === "#geo") { state.tab = "geo"; document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x.dataset.tab === "geo")); }
+$("#meta").textContent = `пул ${DATA.date} · ${DATA.rows.length} вакансий · дом: ${DATA.home}`;
+state.sel = visible()[0]?.slug ?? null;
+draw();
+</script>
+</body>
+</html>

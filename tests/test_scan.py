@@ -48,3 +48,17 @@ def test_scan_pool_and_take(tmp_path):
     assert len(calls) == 2                                          # список + страница без JobPosting
     dst = scan.take("northwind-labs-senior-ai-engineer-krakow-ai", pool.parent, tmp_path / "jobs")
     assert (dst / "raw" / "001-justjoin.txt").is_file() and not (dst / "score.json").exists()
+
+
+def test_map_html(tmp_path):
+    import json
+    from jobradar import poolmap
+    pool = tmp_path / "2026-11-05"
+    scan.scan("https://justjoin.it/job-offers/x", FX, profile=PROFILE, index_path=tmp_path / "i.csv", out=pool,
+              get=fake_get([]), delay=0, log=lambda *a: None)
+    html = poolmap.render(pool, PROFILE).read_text(encoding="utf-8")
+    data = json.loads(html.split("const DATA = ", 1)[1].split(";\nconst DEC", 1)[0])
+    assert {r["company"] for r in data["rows"]} == {"Northwind Labs", "Contoso"}
+    r = next(r for r in data["rows"] if r["company"] == "Northwind Labs")
+    assert r["city"] == "Kraków" and r["url"].endswith("krakow-ai") and r["reply"] and r["km"] > 300
+    assert "/*DATA*/" not in html and "<script src" not in html                    # офлайн, без CDN
