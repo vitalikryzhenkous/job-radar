@@ -82,3 +82,13 @@ def test_company_with_country_in_name(tmp_path):
     p.write_text("ACME Polska\nAI Engineer\nWarszawa, Poland · Remote\nSalary: 100 - 180 PLN/hour (B2B)\nWe build agents.\n")
     e = extract(normalize([p]), FX, ON)
     assert (e["company"], e["role"]) == ("ACME Polska", "AI Engineer")
+
+
+def test_polish_level():
+    from jobradar.extract import polish_level
+    assert polish_level("Org\nRole\nGdańsk\nLanguages: English C1, Polish C1\n", "") == "C1"
+    assert polish_level("Languages: English B2\n", "") is None
+    assert polish_level("", "Advanced level of Polish and English") == "C1"
+    assert polish_level("", "Polish B2 or higher") == "B2"
+    assert polish_level("", "Polish at A2 level, English C1") == "A2"
+    assert polish_level("", "Experience with Polish market") is None

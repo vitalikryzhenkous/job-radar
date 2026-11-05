@@ -8,6 +8,7 @@
   jr map [дата]    пересчитать пул (без сети) и открыть карту в браузере (Fit × Job, города, черновики ответов)
   jr add           вставить вакансии в текущий пул (несколько — через строку ---), пересчёт и карта
   jr move <slug> apply|clarify|skip|auto "почему"   ручное решение в пуле (auto — снять)
+  jr serve [порт]  карта с рабочими кнопками: навыки, скан по ссылке, move, статусы (127.0.0.1, по умолч. 8766)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
@@ -78,11 +79,12 @@ def show(d: Path, res: dict | None = None) -> None:
     print(f"\nПапка: {d}")
 
 
-def open_in_browser(path: Path) -> bool:
-    """WSL: открыть файл в браузере Windows по умолчанию. Нет explorer.exe — просто вернуть False."""
+def open_in_browser(path: Path | str) -> bool:
+    """WSL: открыть файл или http-ссылку в браузере Windows по умолчанию. Нет explorer.exe — False."""
     if not shutil.which("explorer.exe"):
         return False
-    win = subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
+    win = path if isinstance(path, str) else \
+        subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
     subprocess.run(["explorer.exe", win], capture_output=True)   # explorer.exe возвращает 1 даже при успехе
     return True
 
@@ -154,6 +156,9 @@ def main(argv: list[str] | None = None) -> int:
             slug = poolmap.move(pool, args[1], args[2], args[3] if len(args) == 4 else "")
             print(f"{slug}: {args[2]}" + (f" — {args[3]}" if len(args) == 4 else ""))
             refresh_map(pool, fx.get_rates())
+        elif args[:1] == ["serve"] and len(args) <= 2:
+            from . import serve
+            serve.serve(int(args[1]) if len(args) == 2 else serve.PORT, opener=open_in_browser)
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
             show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))
