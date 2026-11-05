@@ -15,4 +15,4 @@ def test_service_companies():
 
 def test_grafana():
     from jobradar.extract import techs
-    assert "Grafana" in techs("Monitoring with Grafana and Prometheus")
+    assert {"Grafana", "Graylog"} <= set(techs("Monitoring with Grafana, logs in Graylog"))
