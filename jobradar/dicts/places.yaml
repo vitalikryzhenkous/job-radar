@@ -1,0 +1,14 @@
+cities:
+  Poznań: ['pozna[nń]', 'познань']
+  Warsaw: ['warsaw', 'warszaw\w*', 'варшав\w*']
+  Kraków: ['krak[oó]w', 'cracow', 'краков']
+  Wrocław: ['wroc[lł]aw', 'вроцлав']
+  Gdańsk: ['gda[nń]sk', 'гданьск']
+  Łódź: ['[lł][oó]d[zź]', 'лодзь']
+countries:
+  PL: ['\bpoland\b', 'польш\w*', '\bpolska\b']
+  US: ['united states', 'соединенные штаты', '\busa\b', '\bU\.S\.']
+  DE: ['\bgermany\b', 'германи\w*']
+  NL: ['\bnetherlands\b', 'нидерланд\w*']
+  ES: ['\bspain\b', 'испани\w*']
+  UK: ['united kingdom', '\bUK\b']

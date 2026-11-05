@@ -1,0 +1,6 @@
+# Заголовок секции: regex в начале строки (после маркеров * • -).
+about: ["About( the (job|role|company))?", "Job Description"]
+responsibilities: ["Your tasks", "What you will do", "What you'll do", "Responsibilities", "Key Responsibilities", "Обязанности"]
+requirements: ["Requirements", "Skills & Experience", "Experience & Skills Required", "What We're Looking For", "Qualifications( \\(purposefully light\\))?", "Требования, добавленные разместившим вакансию участником", "Требования", "Must have"]
+nice: ["Nice to have", "Desired Qualifications", "Preferred Qualifications", "Bonus points", "Будет плюсом"]
+offer: ["Benefits( For You)?", "What's in it for you", "We offer", "Offer", "Мы предлагаем"]

@@ -25,6 +25,7 @@ risks:
   hours_after_18:         {penalty: -5,  target: job}   # не применять, если ставка >= рынка
   cs_degree_required:     {penalty: -5,  target: fit}
   python_5y_must:         {penalty: -10, target: fit}
+  python_must:            {penalty: -5,  target: fit}   # Python обязателен, у профиля basic
   truncated:              {penalty: -5,  target: job}
   polish_c1_must:         {penalty: -10, target: fit}
   polish_c1_nice:         {penalty: 0,   target: fit}
@@ -41,12 +42,16 @@ blockers:
   - industrial_ml_must
   - phd_required
   - onsite_other_city_3d
+  - admin_role                   # админ/эксплуатация вместо разработки
 
 decision:
   apply: {fit: 70, job: 60}      # оба порога -> apply
   skip_below: 50                 # оба < 50 -> skip
   research_min: 50               # исследование, если оба >= 50 и есть missing
-  key_fields: [rate, contract, client]   # нет любого -> clarify
+  key_fields: [rate, contract, client, role, location]   # outreach без любого -> clarify
+  # Публичная вакансия (posting) без ставки: fit >= apply.fit и покрытие job < 50% -> apply,
+  # недостающее уходит в call_notes. Иначе Forte/Inviso никогда не дойдут до apply.
+  posting_low_coverage: 0.5
 
 # Дорога вычитается из ставки перед сравнением с рынком (money), не штраф.
 travel:
