@@ -31,6 +31,8 @@ h1 { font-size: 18px; margin: 0; }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .controls { padding: 0 16px 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .chip[aria-pressed="false"] { opacity: .45; }
+progress { width: 140px; height: 8px; vertical-align: middle; accent-color: var(--accent); }
+#scan-log { margin-left: 8px; font-size: 12px; }
 .chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 input[type=search] { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
   padding: 5px 8px; font: inherit; min-width: 160px; }
@@ -361,7 +363,10 @@ function tools() {
 }
 async function poll() {
   const j = await (await fetch("/api/job")).json();
-  $("#scan-log").textContent = j.error ? "ошибка: " + j.error : (j.log.at(-1) || "старт…");
+  const m = [...j.log].reverse().map(l => /^\[(\d+)\/(\d+)\]/.exec(l)).find(Boolean);   // «[12/50] apply …»
+  $("#scan-log").innerHTML = j.error ? "ошибка: " + esc(j.error)
+    : m ? `<progress max="${m[2]}" value="${m[1]}"></progress> ${m[1]}/${m[2]} · ~${Math.ceil((m[2] - m[1]) * 2 / 60)} мин`
+    : j.running ? `<progress></progress> читаю список…` : esc(j.log.at(-1) || "");
   if (j.running) return setTimeout(poll, 1500);
   $("#scan").disabled = false;
   if (j.pool) location.href = "/?pool=" + encodeURIComponent(j.pool);

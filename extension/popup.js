@@ -65,10 +65,12 @@ async function main() {
 async function poll() {
   $("#actions").replaceChildren();
   const st = await getJSON("/api/job");
-  const log = $("#log"); log.hidden = false;
-  log.textContent = st.log.slice(-12).join("\n"); log.scrollTop = log.scrollHeight;
+  const m = [...st.log].reverse().map(l => /^\[(\d+)\/(\d+)\]/.exec(l)).find(Boolean);   // «[12/50] apply …»
+  const bar = $("#bar"); bar.hidden = !st.running;
   if (st.running) {
-    say(`Оцениваю… ${st.log.length} готово (около 2 с на вакансию). Окно можно закрыть — работа идёт на сервере.`);
+    if (m) { bar.max = +m[2]; bar.value = +m[1]; } else bar.removeAttribute("value");     // без value — «бегущая» полоса
+    say(m ? `Оцениваю ${m[1]} из ${m[2]} · осталось ~${Math.ceil((m[2] - m[1]) * 2 / 60)} мин. Окно можно закрыть — работа идёт на сервере.`
+          : "Начинаю…");
     return setTimeout(poll, 1500);
   }
   if (st.error) return say("Ошибка: " + st.error, "err");
