@@ -99,3 +99,13 @@ def test_english_level():
     assert lang_level("Languages: English C1, Polish C1\n", "", "English") == "C1"
     assert lang_level("", "Fluent English", "English") is None          # fluent не блокируем
     assert lang_level("", "English at C1 level", "English") == "C1"
+    # польские формулировки и вне секции требований (по живому пулу 2026-11-05)
+    for s in ("Angielski C1.", "Znajomość języka angielskiego na poziomie C1.", "Fluent English (C1)",
+              "Język angielski: wymagany na poziomie zaawansowanym (C1) - codzienna współpraca",
+              "Bardzo dobra znajomość języka polskiego (C1) i angielskiego (C1)"):
+        assert lang_level(s, "", "English") == "C1", s
+    for s in ("angielskiego na poziomie min. B2/C1", "języku angielskim (min. B2+/C1)", "Angielski na poziomie B2+"):
+        assert lang_level(s, "", "English") == "B2", s                  # диапазон -> нижняя граница
+    assert lang_level("Polish C1 and English B2", "", "English") == "B2"
+    assert lang_level("Polish C1 and English B2", "", "Polish") == "C1"
+    assert lang_level("Nice to have:\nGerman or English C1", "", "English", "German or English C1") is None
