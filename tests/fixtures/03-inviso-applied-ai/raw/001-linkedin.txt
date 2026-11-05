@@ -1,0 +1,26 @@
+Inviso
+Applied AI Engineer - Poland
+Соединенные Штаты Америки · 15 часов назад · Более 100 кандидатов
+Удаленная работа
+Полный рабочий день
+Простая подача заявки
+Об этой вакансии
+Applied AI Engineer
+Inviso is partnering with one of our clients to find an experienced Backend / Platform Engineer to join their team working remotely. Inviso is managing the recruitment and placement process for this opportunity. This is a remote, direct-hire permanent employee position for our client that is a global multi-billion dollar software conglomerate.
+
+The Applied AI Engineer is responsible for building and operating AI capabilities across an enterprise platform, including agent runtimes, model routing, RAG, tool/function calling, guardrails, evaluation, monitoring, cost management, latency optimization, and production quality controls.
+
+Experience & Skills Required
+Experience shipping software backed by LLMs, ML models, RAG systems, or agentic workflows to real production users.
+Experience designing or implementing agent runtime, orchestration, model routing, tool/function calling, or AI workflow patterns.
+Strong understanding of RAG, grounding, retrieval quality, prompt design, context management, and evaluation approaches.
+Experience building evaluation harnesses, golden sets, regression checks, quality gates, or measurable AI performance frameworks.
+Ability to treat cost, latency, reliability, and safety as first-class engineering constraints.
+Experience building guardrails and controls for AI systems, including untrusted retrieved content, tool output risk, and failure modes.
+Strong communication and collaboration skills for client-facing consulting environments.
+
+Desired Qualifications
+Experience with Claude, GPT, Azure OpenAI, open-source models, model routing, fine-tuning, distillation, or small/edge models.
+Experience with MCP, A2A, multi-agent orchestration, AI tool calling, or agent evaluation.
+Experience with LLM-as-judge approaches calibrated against human evaluation.
+Experience using AI-assisted development tools while maintaining strong review, testing, and safety discipline.

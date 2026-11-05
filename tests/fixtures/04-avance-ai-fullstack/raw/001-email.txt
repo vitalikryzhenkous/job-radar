@@ -1,0 +1,19 @@
+We are looking for "AI Fullstack Developer"- Poland(Remote)
+Hi Vitalii,
+Greetings from Avance Consulting..!!
+I noticed that you are open to new opportunities and thought you might be interested in this position our client is hiring for.
+Role: – "AI Fullstack Developer"- Poland(Remote)
+Contract
+Job Description :
+Role : AI - Full Stack Developer - AI
+Location : Poland (Remote)-Required to work from 6am to 2pm eastern US time
+Contract
+Job Description : Full Stack Engineer – Integration & Automation -
+Responsibilities:
+* Build and maintain integrations between internal systems, third-party APIs, and AI/ML services in production Design automation workflows that reduce manual processes (data pipelines, scheduled jobs, event-driven triggers)
+* Develop full stack product features — frontend to API to database — with a focus on reliability and clean system boundaries
+* Qualifications (purposefully light) BS in Engineering or Computer Science Comfortable across the stack: backend language (Python, Node.js, or similar), frontend framework (React, Vue, etc.), and SQL Experience connecting systems via REST APIs, webhooks, or message queues Systematic, structured thought process Familiarity with Git and basic CI/CD concepts and how AI-powered browser automation works [Phone Screen] 2 hard requirements to screen for when meeting them:
+Thanks,
+[recruiter], Team Lead
+[email removed] · [phone removed]
+https://avanceservices.com/

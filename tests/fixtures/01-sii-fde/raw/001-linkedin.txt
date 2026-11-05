@@ -1,0 +1,47 @@
+Forward Deployed AI Engineer (f/m/x)
+
+Познань, Великопольское воеводство, Польша · 1 день назад · 3 человека нажали «Подать заявку»
+Продвигается нанимающей компанией · Ответы управляются за пределами LinkedIn
+Удаленная работа
+Полный рабочий день
+Подать заявку
+Сохранить
+Люди, с которыми вы можете связаться
+Бывшие сотрудники компании Creatio
+Показать все
+Об этой вакансии
+You sit with the business, not behind it. As a Forward Deployed AI Engineer, you'll work side by side with our clients' teams, find the problems worth solving, and ship AI products that solve them in weeks, not quarters. Part of the job is telling clients honestly what makes sense and what doesn't, and explaining why. You own the whole path: from the first conversation with a business owner, through scoping, estimating, and budgeting the work, to a working prototype and a product in real use.
+
+You'll have a lot of autonomy and real influence. We're looking for someone who spots opportunities, proposes solutions, and drives them forward without waiting to be told what to do.
+
+Your tasks
+Work embedded with client business teams to turn their ideas into concrete, buildable product concepts
+Prototype fast, test with real users, and decide what to scale, pivot, or drop
+Scope, estimate, and budget projects, including key risks and how to mitigate them
+Build and ship LLM-powered products: assistants, agentic workflows, and integrations with business systems
+Bring a product perspective: define success metrics, prioritize by business value, and measure real impact
+Contribute to the strategy and growth of our AI business unit
+
+Requirements
+At least 4 years in software engineering, including shipping LLM-based applications that real users rely on
+Pragmatic Python skills and hands-on experience with LLM APIs, RAG, tool calling, and agent frameworks (LangChain, LangGraph, Semantic Kernel, or equivalent)
+Daily, practical use of AI software development tools such as Claude Code, GitHub Copilot, or Cursor
+A product mindset: you think in MVPs, user feedback, and measurable outcomes
+Excellent communication skills, with the ability to explain technical trade-offs clearly to business stakeholders
+Experience scoping and estimating software or AI projects, including effort, cost, and risk
+A self-starter attitude
+Advanced level of Polish and English
+Residency in Poland
+
+Nice to have
+Frontend skills for quick prototypes and demos (e.g., React, Streamlit, Gradio)
+Startup, product company, or founder experience
+Background in a specific business domain (financial services, manufacturing, healthcare, public sector)
+Working knowledge of a major cloud platform (Azure, AWS, or GCP)
+
+Job no. JOB-7MFKW
+
+Benefits For You
+Great Place to Work
+Profit sharing
+Medical care
