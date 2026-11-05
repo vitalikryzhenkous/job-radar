@@ -2,9 +2,8 @@
 # Кейсы after_NNN: конвейер видит только raw/001..NNN.
 
 01-sii-fde:
-  decision: duplicate
-  duplicate_by: job_id                 # JOB-7MFKW, подан 2026-10-31
-  risks: [polish_c1_must, python_must] # python_must: штраф ещё не задан
+  decision: skip                       # блокер раньше дубля: «Advanced Polish» > A2 (правило 2026-11-05)
+  risks: [python_must]                 # polish_c1_must не дублирует блокер polish_above_max
 
 02-forte-ai-product-engineer:
   empty_index:  {decision: apply}

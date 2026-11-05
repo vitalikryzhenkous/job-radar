@@ -58,6 +58,18 @@ def parse_offer(page: str) -> dict | None:
     return next((d for d in _ld(page) if d.get("@type") == "JobPosting"), None)
 
 
+# языки — не в JobPosting, а в данных страницы (Next.js, JSON с экранированными кавычками)
+LANGS = re.compile(r'\\?"languages\\?":\[((?:\{[^\]{}]*\},?)+)\]')
+LANG_ITEM = re.compile(r'\\?"code\\?":\\?"([a-z]{2})\\?",\\?"level\\?":\\?"([A-Za-z0-9]+)')
+LANG_NAME = {"pl": "Polish", "en": "English", "de": "German", "fr": "French", "es": "Spanish", "uk": "Ukrainian", "ru": "Russian"}
+
+
+def parse_languages(page: str) -> list[tuple[str, str]]:
+    """[(Polish, C1), …] из первого списка languages с code/level (это сама вакансия)."""
+    m = next((m for m in LANGS.finditer(page) if LANG_ITEM.search(m[1])), None)
+    return [(LANG_NAME.get(c, c), lvl.upper()) for c, lvl in LANG_ITEM.findall(m[1])] if m else []
+
+
 def html_text(s: str) -> list[str]:
     s = re.sub(r"<li[^>]*>", "\n- ", s)
     s = re.sub(r"</?(p|br|h\d|ul|ol|div)[^>]*>", "\n", s)
@@ -65,7 +77,7 @@ def html_text(s: str) -> list[str]:
     return [line.strip() for line in s.splitlines() if line.strip() not in ("", "-")]
 
 
-def posting_text(jp: dict, url: str) -> str:
+def posting_text(jp: dict, url: str, langs: list[tuple[str, str]] | None = None) -> str:
     """JobPosting -> текст в формате постинга (компания, роль, место — как LinkedIn-фикстуры)."""
     org = (jp.get("hiringOrganization") or {}).get("name") or "?"
     addr = ((jp.get("jobLocation") or {}).get("address") or {})
@@ -85,16 +97,22 @@ def posting_text(jp: dict, url: str) -> str:
                      f"{sal.get('currency', 'PLN')}/{unit}" + (f" ({', '.join(contract)})" if contract else ""))
     elif contract:
         lines.append("Contract: " + ", ".join(contract))
+    lines.append("Languages: " + (", ".join(f"{n} {lvl}" for n, lvl in langs) if langs else "-"))   # «-» = проверено, нет
     lines += html_text(jp.get("description") or "")
     return "\n".join(lines) + "\n"
 
 
-def why(ex: dict, profile: dict) -> str:
-    """Почему подходишь: что из обязательного стека есть в профиле и чего нет."""
+def match(ex: dict, profile: dict) -> tuple[list[str], list[str]]:
+    """(есть, нет): обязательный стек вакансии против навыков профиля."""
     idx = skill_index(profile)
     terms = list(dict.fromkeys(t for g in ex["stack"]["must"] for t in g["terms"]))
     have = [t for t in terms if skill_weight(t, idx) > 0]
-    gaps = [t for t in terms if t not in have]
+    return have, [t for t in terms if t not in have]
+
+
+def why(ex: dict, profile: dict) -> str:
+    """Почему подходишь: что из обязательного стека есть в профиле и чего нет."""
+    have, gaps = match(ex, profile)
     out = []
     if have:
         out.append("есть: " + ", ".join(have[:6]))
@@ -117,19 +135,23 @@ def scan(url: str, rates: dict, *, limit: int = 50, profile: dict | None = None,
         slug = it["url"].rstrip("/").rsplit("/", 1)[-1]
         d = out / slug
         f = d / "raw" / "001-justjoin.txt"
-        if not f.is_file():                        # уже скачано сегодня — не дёргаем сайт повторно
+        old = f.read_text(encoding="utf-8") if f.is_file() else ""
+        if "\nLanguages: " not in old:            # нет или скачано до поля языков — один раз докачать
             time.sleep(delay)
-            jp = parse_offer(get(it["url"]))
+            page = get(it["url"])
+            jp = parse_offer(page)
             if not jp:
                 log(f"[{n}/{len(items)}] пропуск, нет JobPosting: {it['url']}")
                 continue
             f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(posting_text(jp, it["url"]), encoding="utf-8")
+            f.write_text(posting_text(jp, it["url"], parse_languages(page)), encoding="utf-8")
         res = pipeline.run(d, rates, index_path=index_path, profile=profile, write_index=False)
         sc = res["score"]
         log(f"[{n}/{len(items)}] {sc['decision']:<9} fit {sc['fit']:>3} job {sc['job'] if sc['job'] is not None else 'н/д':>3}  {slug}")
         rows.append({"slug": slug, "url": it["url"], "res": res})
     (out / "pool.md").write_text(pool_md(rows, profile, url), encoding="utf-8")
+    seen = {"url": url, "at": dt.datetime.now().isoformat(timespec="seconds"), "slugs": [r["slug"] for r in rows]}
+    (out / "scan.json").write_text(json.dumps(seen, ensure_ascii=False, indent=1), encoding="utf-8")   # для «пропала»
     return out / "pool.md"
 
 

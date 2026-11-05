@@ -56,9 +56,44 @@ def test_map_html(tmp_path):
     pool = tmp_path / "2026-11-05"
     scan.scan("https://justjoin.it/job-offers/x", FX, profile=PROFILE, index_path=tmp_path / "i.csv", out=pool,
               get=fake_get([]), delay=0, log=lambda *a: None)
+    assert poolmap.rescore(pool, FX, PROFILE, tmp_path / "i.csv") == 2 and not (tmp_path / "i.csv").exists()
     html = poolmap.render(pool, PROFILE).read_text(encoding="utf-8")
     data = json.loads(html.split("const DATA = ", 1)[1].split(";\nconst DEC", 1)[0])
     assert {r["company"] for r in data["rows"]} == {"Northwind Labs", "Contoso"}
     r = next(r for r in data["rows"] if r["company"] == "Northwind Labs")
     assert r["city"] == "Kraków" and r["url"].endswith("krakow-ai") and r["reply"] and r["km"] > 300
     assert "/*DATA*/" not in html and "<script src" not in html                    # офлайн, без CDN
+
+
+def test_add_and_move(tmp_path, monkeypatch):
+    import json
+    from jobradar import poolmap, quick
+    pool = tmp_path / "2026-11-05"
+    pool.mkdir()
+    monkeypatch.setattr(quick, "INDEX", tmp_path / "i.csv")
+    a = (FIX / "08-synthetic-low-job" / "raw" / "001-linkedin.txt").read_text(encoding="utf-8")
+    b = (FIX / "02-forte-ai-product-engineer" / "raw").glob("*.txt").__next__().read_text(encoding="utf-8")
+    slugs = quick.add_to_pool(f"{a}\nhttps://www.linkedin.com/jobs/view/123/?x=1\n---\n{b}", FX, pool)
+    assert len(slugs) == 2 and all((pool / s / "raw").is_dir() for s in slugs)
+    head = (pool / slugs[0] / "raw" / "001-linkedin.txt").read_text(encoding="utf-8").splitlines()
+    assert head[3] == "Source: https://www.linkedin.com/jobs/view/123" and "x=1" not in "".join(head)
+    poolmap.rescore(pool, FX, PROFILE, tmp_path / "i.csv")
+    assert poolmap.move(pool, slugs[0][:8], "apply", "роль моя") == slugs[0]
+    data = json.loads(poolmap.render(pool, PROFILE).read_text(encoding="utf-8")
+                      .split("const DATA = ", 1)[1].split(";\nconst DEC", 1)[0])
+    r = {x["slug"]: x for x in data["rows"]}
+    assert r[slugs[0]]["decision"] == "apply" and r[slugs[0]]["manual"] == "роль моя"
+    assert r[slugs[0]]["url"] == "https://www.linkedin.com/jobs/view/123" and r[slugs[1]]["manual"] is None
+    poolmap.move(pool, slugs[0], "auto")
+    assert poolmap.overrides(pool) == {} and not (tmp_path / "i.csv").exists()
+    import pytest
+    with pytest.raises(ValueError):
+        poolmap.move(pool, slugs[0], "maybe")
+
+
+def test_languages_from_page():
+    page = ('<script>self.__next_f.push([1,"{\\"slug\\":\\"x\\",\\"languages\\":[{\\"code\\":\\"en\\",\\"level\\":\\"C1\\"},'
+            '{\\"code\\":\\"pl\\",\\"level\\":\\"C1\\"}]}"])</script>'
+            '<script>{"layout":{"languages":{"pl":"Polish","en":"English"}}}</script>')
+    assert scan.parse_languages(page) == [("English", "C1"), ("Polish", "C1")]
+    assert scan.parse_languages("<html></html>") == []
