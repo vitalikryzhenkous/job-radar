@@ -1,0 +1,28 @@
+# Ожидаемые решения. Тексты фикстур добавит владелец.
+01-sii-fde:
+  decision: duplicate
+  duplicate_by: job_id          # JOB-7MFKW, подан 2026-10-31
+  risks: [polish_c1_must]
+02-forte-ai-product-engineer:
+  cases:
+    empty_index:  {decision: apply}
+    seeded_index: {decision: duplicate, duplicate_by: company_role}   # подан 2026-11-04
+03-inviso-applied-ai:
+  decision: apply               # direct-hire permanent = договор известен (UoP)
+  contract: [UoP]
+  call_notes: ["уточнить B2B на звонке"]
+04-avance-ai-fullstack:
+  decision: clarify
+  risks: [intermediary_no_client, hours_after_18, truncated]
+  rate_pln_h: [125.0, 137.5]
+  counter_offer_pln_day: 1300
+05-empty-email:
+  decision: clarify
+  template: empty
+06-us-only:
+  decision: skip
+  blockers: [us_only]
+07-warsaw-claude-enterprise:
+  decision: clarify
+  risks: [wrong_name, onsite_other_city_1d]
+  travel_pln_per_trip: 200
