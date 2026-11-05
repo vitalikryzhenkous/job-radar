@@ -188,7 +188,7 @@ function list(rows) {
   if (!rows.length) return `<div class="empty">Ничего не подходит под фильтры</div>`;
   return rows.map(r => `<div class="row ${state.sel === r.slug ? "sel" : ""}" data-slug="${r.slug}">
     <button class="star-btn ${state.stars.has(r.slug) ? "on" : ""}" data-star="${r.slug}" title="в шортлист">${state.stars.has(r.slug) ? "★" : "☆"}</button>
-    <div class="t"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i><b>${esc(r.company)}</b> — ${esc(r.role)}</div>
+    <div class="t">${r.manual !== null ? "✋ " : ""}<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i><b>${esc(r.company)}</b> — ${esc(r.role)}</div>
     <div class="n">fit ${r.fit} · job ${r.job ?? "н/д"} · ${rateTxt(r)}</div></div>`).join("");
 }
 
@@ -209,12 +209,17 @@ function detail() {
     ${r.money_note ? `<div>💰 ${esc(r.money_note)}</div>` : ""}
     <div style="margin-top:6px">🧩 ${esc(r.why)}</div>
     ${r.risks.length ? `<div style="margin-top:6px">⚠️ ${r.risks.map(esc).join(", ")}</div>` : ""}
-    <div style="margin-top:6px" class="muted">Причина решения: ${esc(r.reason)}</div>
+    ${r.manual !== null ? `<div style="margin-top:6px">✋ <b>вручную</b> (скрипт: ${DEC_RU[r.auto]})${r.manual ? ": " + esc(r.manual) : ""}</div>` : ""}
+    <div style="margin-top:6px" class="muted">Причина решения скрипта: ${esc(r.reason)}</div>
     <div class="actions">
       <a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener">открыть вакансию</a>
       <button class="btn" id="cp-take">копировать: jr take</button>
       <button class="btn" id="cp-eval">копировать: /job-eval</button>
       <button class="btn" id="st">${state.stars.has(r.slug) ? "★ в шортлисте" : "☆ в шортлист"}</button>
+    </div>
+    <div class="actions"><span class="muted">Неверное решение? Скопировать команду:</span>
+      ${["apply", "clarify", "skip"].filter(d => d !== r.decision).map(d => `<button class="btn" data-move="${d}">→ ${DEC_RU[d]}</button>`).join("")}
+      ${r.manual !== null ? `<button class="btn" data-move="auto">снять ручное</button>` : ""}
     </div>
     ${r.call_notes.length ? `<details open><summary>Спросить на звонке</summary><ul>${r.call_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
     ${r.reply ? `<details open><summary>Черновик ответа (шаблон ${esc(r.template)})</summary>
@@ -225,6 +230,8 @@ function detail() {
   $("#cp-take").onclick = e => copy(`jr take ${r.slug}`, e.target);
   $("#cp-eval").onclick = e => copy(`/job-eval ${r.slug}`, e.target);
   $("#st").onclick = () => toggleStar(r.slug);
+  document.querySelectorAll("[data-move]").forEach(b => b.onclick = () =>
+    copy(`jr move ${r.slug} ${b.dataset.move}` + (b.dataset.move === "auto" ? "" : ` "почему"`), b));
   if ($("#cp-reply")) $("#cp-reply").onclick = e => copy($("#reply").value, e.target);
 }
 

@@ -6,6 +6,8 @@
   jr ls            список вакансий
   jr scan <url>    пул с justjoin.it (до 50, пауза 2 с) -> jobs/_pool/<дата>/pool.md, index.csv не меняется
   jr map [дата]    пересчитать пул (без сети) и открыть карту в браузере (Fit × Job, города, черновики ответов)
+  jr add           вставить вакансии в текущий пул (несколько — через строку ---), пересчёт и карта
+  jr move <slug> apply|clarify|skip|auto "почему"   ручное решение в пуле (auto — снять)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
@@ -42,14 +44,14 @@ def read_text() -> str:
     return text
 
 
-def new_slug(text: str, rates: dict) -> str:
+def new_slug(text: str, rates: dict, where: Path | None = None) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "001-text.txt"
         p.write_text(text + "\n", encoding="utf-8")
         ex = extract(normalize([p]), rates)
     base = tracker.slugify(ex["company"] or "", ex["role"] or "") or dt.datetime.now().strftime("job-%Y%m%d-%H%M")
     slug, i = base, 2
-    while (JOBS / slug).exists():          # тот же слаг: новая папка, дубль поймает index.csv
+    while ((where or JOBS) / slug).exists():          # тот же слаг: новая папка, дубль поймает index.csv
         slug, i = f"{base}-{i}", i + 1
     return slug
 
@@ -85,6 +87,37 @@ def open_in_browser(path: Path) -> bool:
     return True
 
 
+SPLIT = re.compile(r"^\s*-{3,}\s*$", re.M)
+
+
+def add_to_pool(text: str, rates: dict, pool: Path) -> list[str]:
+    """Вставка одной или нескольких вакансий (разделитель — строка ---) в пул."""
+    slugs = []
+    for chunk in (c.strip() for c in SPLIT.split(text)):
+        if not chunk:
+            continue
+        lines = chunk.splitlines()
+        src = next((m for x in lines if (m := poolmap.LINK.fullmatch(x.strip().split("?")[0].rstrip("/")))), None)
+        if src:                          # ссылка -> «Source:» 4-й строкой, как у jr scan; шапка компания/роль/город цела
+            lines = [x for x in lines if x.strip().split("?")[0].rstrip("/") != src[0]]
+            lines.insert(min(3, len(lines)), f"Source: {src[0]}")
+            chunk = "\n".join(lines)
+        kind = "linkedin" if src and "linkedin" in src[0] else guess_source(chunk)
+        slug = new_slug(chunk, rates, pool)
+        (pool / slug / "raw").mkdir(parents=True)
+        (pool / slug / "raw" / f"001-{kind}.txt").write_text(chunk + "\n", encoding="utf-8")
+        slugs.append(slug)
+    return slugs
+
+
+def refresh_map(pool: Path, rates: dict) -> None:
+    profile = load_profile()
+    n = poolmap.rescore(pool, rates, profile, INDEX)     # профиль/словари могли измениться
+    out = poolmap.render(pool, profile)
+    print(f"Пересчитано: {n}")
+    print(f"Карта: {out}" + ("" if open_in_browser(out) else " (открой файл в браузере)"))
+
+
 def ls() -> None:
     rows = tracker.read_index(INDEX)
     if not rows:
@@ -105,11 +138,22 @@ def main(argv: list[str] | None = None) -> int:
             md = scan.scan(args[1], fx.get_rates(), index_path=INDEX)
             print(f"Готово: {md}\nКарта: {poolmap.render(md.parent)}")
         elif args[:1] == ["map"] and len(args) <= 2:
-            pool, profile = scan.POOL / args[1] if len(args) == 2 else poolmap.latest(), load_profile()
-            n = poolmap.rescore(pool, fx.get_rates(), profile, INDEX)     # профиль/словари могли измениться
-            out = poolmap.render(pool, profile)
-            print(f"Пересчитано: {n}")
-            print(f"Карта: {out}" + ("" if open_in_browser(out) else " (открой файл в браузере)"))
+            refresh_map(scan.POOL / args[1] if len(args) == 2 else poolmap.latest(), fx.get_rates())
+        elif args == ["add"]:
+            text, rates = read_text(), fx.get_rates()
+            try:
+                pool = poolmap.latest()                          # текущий пул (последний скан)
+            except (ValueError, FileNotFoundError):              # пулов ещё нет
+                pool = scan.POOL / dt.date.today().isoformat()
+                pool.mkdir(parents=True)
+            for slug in add_to_pool(text, rates, pool):
+                print(f"Добавлено: {slug}")
+            refresh_map(pool, rates)
+        elif args[:1] == ["move"] and len(args) in (3, 4):
+            pool = poolmap.latest()
+            slug = poolmap.move(pool, args[1], args[2], args[3] if len(args) == 4 else "")
+            print(f"{slug}: {args[2]}" + (f" — {args[3]}" if len(args) == 4 else ""))
+            refresh_map(pool, fx.get_rates())
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
             show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))

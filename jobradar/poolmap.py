@@ -4,9 +4,13 @@
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import math
+import re
 from pathlib import Path
+
+import yaml
 
 from .config import load_profile
 from .scan import POOL, why
@@ -30,12 +34,43 @@ def km(a: tuple, b: tuple) -> int:
     return round(2 * 6371 * math.asin(math.sqrt(h)))
 
 
+LINK = re.compile(r"https?://(?:www\.)?linkedin\.com/jobs/view/\d+|https?://justjoin\.it/job-offer/\S+")
+DECISIONS = ("apply", "clarify", "skip")
+
+
 def _raw_head(d: Path) -> tuple[str, str]:
-    """(город, url) из шапки текста, который записал jr scan."""
-    lines = (sorted((d / "raw").glob("*.txt"))[0]).read_text(encoding="utf-8").splitlines()
-    city = lines[2].split(",")[0].strip() if len(lines) > 2 else ""
+    """(город, url) из шапки: jr scan пишет «Source:» и город в 3-й строке; во вставке ищем ссылку в тексте."""
+    text = (sorted((d / "raw").glob("*.txt"))[0]).read_text(encoding="utf-8")
+    lines = text.splitlines()
+    city = re.split(r"[,·]", lines[2])[0].strip() if len(lines) > 2 else ""
     url = next((x[8:] for x in lines[:6] if x.startswith("Source: ")), "")
+    if not url and (m := LINK.search(text)):
+        url = m[0]
     return ALIAS.get(city, city), url
+
+
+# ---------- ручные решения (jr move)
+
+def overrides(pool_dir: Path) -> dict:
+    p = pool_dir / "overrides.yaml"
+    return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.is_file() else {}
+
+
+def move(pool_dir: Path, name: str, decision: str, why: str = "") -> str:
+    """Ручное решение по вакансии пула. decision=auto — снять. Баллы не меняются."""
+    if decision not in (*DECISIONS, "auto"):
+        raise ValueError(f"решение: {', '.join(DECISIONS)} или auto")
+    hits = [p.name for p in pool_dir.iterdir() if (p / "raw").is_dir() and name.lower() in p.name]
+    slug = name if name in hits else hits[0] if len(hits) == 1 else None
+    if not slug:
+        raise ValueError(f"«{name}»: " + ("нет в пуле" if not hits else "несколько: " + ", ".join(sorted(hits))))
+    ov = overrides(pool_dir)
+    if decision == "auto":
+        ov.pop(slug, None)
+    else:
+        ov[slug] = {"decision": decision, "why": why, "date": dt.date.today().isoformat()}
+    (pool_dir / "overrides.yaml").write_text(yaml.safe_dump(ov, allow_unicode=True, sort_keys=True), encoding="utf-8")
+    return slug
 
 
 def _read(p: Path) -> str:
@@ -44,16 +79,21 @@ def _read(p: Path) -> str:
 
 def rows(pool_dir: Path, profile: dict) -> list[dict]:
     home = ALIAS.get(profile.get("location", {}).get("city", ""), profile.get("location", {}).get("city", ""))
+    ov = overrides(pool_dir)
     out = []
     for d in sorted(p for p in pool_dir.iterdir() if (p / "score.json").is_file()):
         ex = json.loads(_read(d / "extract.json"))
         sc = json.loads(_read(d / "score.json"))
         f = json.loads(_read(d / "flags.json"))
         city, url = _raw_head(d)
+        if city not in CITY_XY and ex["location"]["cities"]:          # вставка LinkedIn: город из extract
+            city = ALIAS.get(ex["location"]["cities"][0], ex["location"]["cities"][0])
+        manual = ov.get(d.name)
         rate = ex["rate"]["pln_h"] if ex["rate"] else None
         out.append({
             "slug": d.name, "url": url, "company": ex["company"] or "?", "role": ex["role"] or "?",
-            "decision": sc["decision"], "reason": sc["reason"], "fit": sc["fit"], "job": sc["job"],
+            "decision": manual["decision"] if manual else sc["decision"], "auto": sc["decision"],
+            "manual": (manual.get("why") or "") if manual else None, "reason": sc["reason"], "fit": sc["fit"], "job": sc["job"],
             "rate": rate, "money_note": sc["money_note"], "remote": ex["location"]["remote"],
             "onsite_days": ex["location"]["onsite_days_per_week"], "city": city,
             "km": km(CITY_XY[city], CITY_XY[home]) if city in CITY_XY and home in CITY_XY else None,
