@@ -98,3 +98,25 @@ def test_seen_registry(tmp_path):
     after = poolmap.seen_registry(tmp_path)
     assert after["beta-dev"]["first"] == "2026-11-01" and after["beta-dev"]["last"] == "2026-11-05"
     assert poolmap.remember(b, new) == after                                                 # повтор — без изменений
+
+
+def test_extension_id_matches_manifest():
+    import base64, hashlib
+    from helpers import FIX
+    key = json.loads((FIX.parent.parent / "extension" / "manifest.json").read_text(encoding="utf-8"))["key"]
+    h = hashlib.sha256(base64.b64decode(key)).hexdigest()[:32]
+    assert "".join(chr(ord("a") + int(c, 16)) for c in h) == serve.EXT_ID
+
+
+def test_collect_only_from_extension(server):
+    port, job, root = server
+    job._go = lambda fn: setattr(job, "went", True)                     # без сети и потоков
+    ext = f"chrome-extension://{serve.EXT_ID}"
+    good = {"urls": ["https://nofluffjobs.com/pl/job/frontend-developer-acme-remote"]}
+    assert post(port, "/api/collect", good, token="", origin=f"http://127.0.0.1:{port}")[0] == 403   # даже своя страница
+    assert post(port, "/api/collect", good, token="", origin="chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")[0] == 403
+    assert post(port, "/api/collect", good, token="")[0] == 403                                       # без Origin
+    code, j = post(port, "/api/collect", {"urls": ["https://www.linkedin.com/jobs/view/1"]}, token="", origin=ext)
+    assert code == 400 and not hasattr(job, "went")
+    assert post(port, "/api/collect", good, token="", origin=ext) == (200, {"ok": "started", "n": 1})
+    assert job.went

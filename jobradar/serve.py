@@ -2,9 +2,12 @@
 
 Защита от чужих страниц в том же браузере: POST только с заголовком X-JR-Token (токен есть лишь в нашей
 странице), Host — localhost/127.0.0.1 (DNS rebinding), Origin — свой. Скан — только https://justjoin.it/.
+Расширение (extension/) токена не знает: /api/collect пускает только Origin chrome-extension://EXT_ID.
+Origin ставит сам браузер, чужая страница подделать его не может; ID закреплён ключом "key" в manifest.json.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import secrets
@@ -18,6 +21,7 @@ from .config import load_profile
 from .tracker import INDEX
 
 PORT = 8766
+EXT_ID = "blkfpbeaffooeaomfglgkeookoadflid"      # = sha256(manifest.key)[:32] в алфавите a-p; тест сверяет
 
 
 class Job:
@@ -26,29 +30,42 @@ class Job:
         self.lock, self.running, self.log, self.error, self.pool = threading.Lock(), False, [], None, None
 
     def start(self, url: str) -> None:
+        self._go(lambda: scan.scan(url, fx.get_rates(), index_path=INDEX, log=self.log.append).parent.name)
+
+    def collect(self, urls: list[str]) -> None:
+        for u in urls[:scan.MAX_COLLECT + 1]:      # проверка до старта: ошибка уходит ответом, а не в лог
+            scan.site_of(u)
+
+        def run():
+            self.summary = scan.collect(urls, fx.get_rates(), index_path=INDEX, log=self.log.append)
+            return scan.POOL.joinpath(dt.date.today().isoformat()).name
+        self._go(run)
+
+    def _go(self, fn) -> None:
         with self.lock:
             if self.running:
                 raise ValueError("скан уже идёт")
-            self.running, self.log, self.error, self.pool = True, [], None, None
-        threading.Thread(target=self._run, args=(url,), daemon=True).start()
+            self.running, self.log, self.error, self.pool, self.summary = True, [], None, None, None
+        threading.Thread(target=self._run, args=(fn,), daemon=True).start()
 
-    def _run(self, url: str) -> None:
+    def _run(self, fn) -> None:
         try:
-            md = scan.scan(url, fx.get_rates(), index_path=INDEX, log=self.log.append)
-            self.pool = md.parent.name
-            self.log.append(f"Готово: {md.parent.name}")
+            self.pool = fn()
+            self.log.append(f"Готово: {self.pool}")
         except Exception as e:                     # в лог страницы, сервер живёт дальше
             self.error = f"{type(e).__name__}: {e}"
         finally:
             self.running = False
 
     def state(self) -> dict:
-        return {"running": self.running, "log": self.log[-200:], "error": self.error, "pool": self.pool}
+        return {"running": self.running, "log": self.log[-200:], "error": self.error, "pool": self.pool,
+                "summary": getattr(self, "summary", None)}
 
 
-def make_handler(token: str, port: int, job: Job, pool_root: Path = scan.POOL):
+def make_handler(token: str, port: int, job: Job, pool_root: Path = scan.POOL, ext_id: str = EXT_ID):
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     origins = {f"http://{h}" for h in hosts}
+    ext = f"chrome-extension://{ext_id}"
 
     def pool_of(name: str | None) -> Path:
         if name:
@@ -90,11 +107,27 @@ def make_handler(token: str, port: int, job: Job, pool_root: Path = scan.POOL):
                     return self._send(200, poolmap.html(d).encode(), "text/html; charset=utf-8")
                 if u.path == "/api/job":
                     return self._json(200, job.state())
+                if u.path == "/api/sites":             # шаблоны ссылок для расширения: один источник правды — scan.SITES
+                    return self._json(200, {h: rx for h, (_, rx) in scan.SITES.items()})
             except (ValueError, OSError) as e:
                 return self._json(400, {"error": str(e)})
             self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
+            if urlparse(self.path).path == "/api/collect":         # только наше расширение
+                if not self._host_ok() or self.headers.get("Origin") != ext:
+                    return self._json(403, {"error": "forbidden"})
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    if n > 100_000:
+                        raise ValueError("слишком большой запрос")
+                    urls = json.loads(self.rfile.read(n) or b"{}").get("urls")
+                    if not isinstance(urls, list) or not all(isinstance(u, str) for u in urls):
+                        raise ValueError("urls: список строк")
+                    job.collect(urls)
+                    return self._json(200, {"ok": "started", "n": len(urls)})
+                except (ValueError, json.JSONDecodeError, AttributeError) as e:
+                    return self._json(400, {"error": str(e)})
             if not self._host_ok() or self.headers.get("Origin", next(iter(origins))) not in origins \
                     or not secrets.compare_digest(self.headers.get("X-JR-Token", ""), token):
                 return self._json(403, {"error": "forbidden"})

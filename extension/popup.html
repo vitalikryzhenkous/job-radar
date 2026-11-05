@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+  :root { --bg: #fff; --ink: #1d1d1f; --muted: #6b6b70; --line: #ddd; --accent: #1f7a5a; --err: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1e1f22; --ink: #e8e8ea; --muted: #9a9aa0; --line: #3a3b3f; --accent: #4fbf94; --err: #ff8a80; } }
+  body { margin: 0; padding: 12px 14px; width: 320px; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  .muted { color: var(--muted); } .err { color: var(--err); }
+  button { margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--accent);
+           color: #fff; font: inherit; cursor: pointer; } button.sec { background: transparent; color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { margin: 8px 0 0; max-height: 160px; overflow: auto; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
+  ul { margin: 6px 0 0; padding-left: 18px; }
+</style></head>
+<body>
+  <h1>Job Radar</h1>
+  <div id="msg" class="muted">Ищу вакансии на странице…</div>
+  <div id="actions"></div>
+  <pre id="log" hidden></pre>
+  <script src="popup.js"></script>
+</body></html>
