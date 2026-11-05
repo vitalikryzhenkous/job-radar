@@ -124,6 +124,8 @@ def why(ex: dict, profile: dict) -> str:
 def scan(url: str, rates: dict, *, limit: int = 50, profile: dict | None = None, index_path: Path = tracker.INDEX,
          out: Path | None = None, get=fetch, delay: float = DELAY, log=print) -> Path:
     from .config import load_profile
+    if not url.startswith("https://justjoin.it/"):     # LinkedIn не качаем никогда: только jr add (вставка)
+        raise ValueError("jr scan — только ссылки https://justjoin.it/ (LinkedIn — через jr add)")
     profile = profile or load_profile()
     out = out or POOL / dt.date.today().isoformat()
     out.mkdir(parents=True, exist_ok=True)

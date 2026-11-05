@@ -97,3 +97,12 @@ def test_languages_from_page():
             '<script>{"layout":{"languages":{"pl":"Polish","en":"English"}}}</script>')
     assert scan.parse_languages(page) == [("English", "C1"), ("Polish", "C1")]
     assert scan.parse_languages("<html></html>") == []
+
+
+def test_scan_only_justjoin(tmp_path):
+    import pytest
+    from jobradar import scan
+    for bad in ("https://www.linkedin.com/jobs/search-results/?currentJobId=1", "http://justjoin.it/x", "https://justjoin.it.evil.com/"):
+        with pytest.raises(ValueError):
+            scan.scan(bad, {}, out=tmp_path, get=lambda u: (_ for _ in ()).throw(AssertionError("сеть")), profile={})
+    assert not any(tmp_path.iterdir())
