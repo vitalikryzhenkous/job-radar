@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import re
 
+from .extract import CEFR
 from .tracker import slugify
+
+POLISH_MAX = "A2"          # владелец 2026-11-05: польский выше A2 обязателен -> skip; профиль может задать polish_max
 
 I = re.I
 SCAM = {
@@ -60,6 +63,10 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
     req_text = " ".join(g["line"] for g in ex["stack"]["must"])
 
     # --- блокеры
+    lvl, top = ex["languages"].get("polish_level"), profile.get("polish_max", POLISH_MAX)
+    polish_blocked = bool(lvl) and CEFR.index(lvl) > CEFR.index(top)
+    if polish_blocked:
+        blockers.append(_risk("polish_above_max", f"Polish {lvl} (допустимо до {top})"))
     if ex["work_auth"] == "US" or (ex["residency_required"] or "").lower() in {"us", "usa", "united states"}:
         blockers.append(_risk("us_only", "US work authorization / residency"))
     elif ex["residency_required"] and ex["residency_required"].lower() not in HOME_COUNTRY:
@@ -95,7 +102,7 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
     if ex["truncated"]:
         risks.append(_risk("truncated", "описание обрывается"))
     pol = ex["languages"]["polish_high"]
-    if pol:
+    if pol and not polish_blocked:
         risks.append(_risk(f"polish_c1_{pol}", "Polish C1+"))
     first = profile.get("first_name")
     wrong = [n for n in ex["greeting_names"] if first and n.lower() != first.lower()]

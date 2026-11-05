@@ -89,3 +89,11 @@ def test_add_and_move(tmp_path, monkeypatch):
     import pytest
     with pytest.raises(ValueError):
         poolmap.move(pool, slugs[0], "maybe")
+
+
+def test_languages_from_page():
+    page = ('<script>self.__next_f.push([1,"{\\"slug\\":\\"x\\",\\"languages\\":[{\\"code\\":\\"en\\",\\"level\\":\\"C1\\"},'
+            '{\\"code\\":\\"pl\\",\\"level\\":\\"C1\\"}]}"])</script>'
+            '<script>{"layout":{"languages":{"pl":"Polish","en":"English"}}}</script>')
+    assert scan.parse_languages(page) == [("English", "C1"), ("Polish", "C1")]
+    assert scan.parse_languages("<html></html>") == []
