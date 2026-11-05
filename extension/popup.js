@@ -68,15 +68,17 @@ async function poll() {
   const m = [...st.log].reverse().map(l => /^\[(\d+)\/(\d+)\]/.exec(l)).find(Boolean);   // «[12/50] apply …»
   const bar = $("#bar"); bar.hidden = !st.running;
   if (st.running) {
-    if (m) { bar.max = +m[2]; bar.value = +m[1]; } else bar.removeAttribute("value");     // без value — «бегущая» полоса
+    bar.classList.toggle("wait", !m);                                  // ещё нет «[n/N]» — бегущие блоки
+    $("#fill").style.width = m ? `${Math.round(100 * m[1] / m[2])}%` : "";
     say(m ? `Оцениваю ${m[1]} из ${m[2]} · осталось ~${Math.ceil((m[2] - m[1]) * 2 / 60)} мин. Окно можно закрыть — работа идёт на сервере.`
           : "Начинаю…");
     return setTimeout(poll, 1500);
   }
   if (st.error) return say("Ошибка: " + st.error, "err");
   const sum = Object.entries(st.summary || {}).map(([k, v]) => `${DEC_RU[k] || k}: ${v}`).join(" · ");
-  say(`Готово, пул ${st.pool}. ${sum}`, "");
+  say(`Готово, пул ${st.pool}. ${sum}`, "ok");
   button("Открыть карту", () => chrome.tabs.create({ url: API + "/" }));
+  button("Ещё раз", () => location.reload(), "sec");
 }
 
 main().catch(e => say("Ошибка: " + e.message, "err"));
