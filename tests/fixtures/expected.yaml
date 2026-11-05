@@ -1,28 +1,72 @@
-# Ожидаемые решения. Тексты фикстур добавит владелец.
+# Ожидаемые результаты. Коды рисков и блокеров = ключи config/weights.yaml.
+# Кейсы after_NNN: конвейер видит только raw/001..NNN.
+
 01-sii-fde:
   decision: duplicate
-  duplicate_by: job_id          # JOB-7MFKW, подан 2026-10-31
-  risks: [polish_c1_must]
+  duplicate_by: job_id                 # JOB-7MFKW, подан 2026-10-31
+  risks: [polish_c1_must, python_must] # python_must: штраф ещё не задан
+
 02-forte-ai-product-engineer:
-  cases:
-    empty_index:  {decision: apply}
-    seeded_index: {decision: duplicate, duplicate_by: company_role}   # подан 2026-11-04
+  empty_index:  {decision: apply}
+  seeded_index: {decision: duplicate, duplicate_by: company_role}   # подан 2026-11-04
+
 03-inviso-applied-ai:
-  decision: apply               # direct-hire permanent = договор известен (UoP)
-  contract: [UoP]
+  decision: apply
+  contract: [UoP]                      # direct-hire permanent employee
   call_notes: ["уточнить B2B на звонке"]
+  job: null                            # н/д: известно < 50% весов job
+  coverage_below: 0.5
+
 04-avance-ai-fullstack:
-  decision: clarify
-  risks: [intermediary_no_client, hours_after_18, truncated]
-  rate_pln_h: [125.0, 137.5]
-  counter_offer_pln_day: 1300
-05-empty-email:
+  after_001:
+    decision: clarify
+    missing: [rate, client]
+    risks: [intermediary_no_client, truncated, hours_after_18, cs_degree_required]
+    hours: {start: "12:00", end: "20:00", tz: Europe/Warsaw}   # 6–14 ET
+  after_002:
+    decision: clarify
+    rate_pln_h: [125.0, 137.5]
+    below_market: true
+    counter_pln_day: 1100
+    floor_pln_day: 1050
+  after_003:
+    decision: clarify
+    truncated: true
+    screen_questions: 2
+  after_004:                           # RTR-запрос, клиента ещё нет
+    decision: clarify
+    template: rtr
+    pre_rtr_failed: ["клиент назван"]
+  after_005:                           # submission summary: Hexaware Europe, 1100 PLN/день, Ltd: Yes
+    decision: clarify
+    risks: [hours_after_18, cs_degree_required, truncated, intermediary_chain, rtr_request, submission_mismatch]
+    missing: []
+    below_market: true                 # floor 1050 не нарушен: 1100 >= 1050 (решение владельца)
+    money_note: "ставка ниже рынка"    # в тестовом профиле best_offer $30 ≈ 938 PLN/день; в реальном ($40) — «и лучшего оффера»
+    template: rtr
+    pre_rtr_variant: rate_first
+    pre_rtr_failed: []
+    pre_rtr_fixes: ["исправить до RTR: Own Limited Company: Yes -> JDG"]
+
+05-empty-outreach:
   decision: clarify
   template: empty
-06-us-only:
+
+06-us-only-fde:
   decision: skip
-  blockers: [us_only]
-07-warsaw-claude-enterprise:
+  blockers: [us_only]                  # Authorised to work in the US
+
+08-synthetic-low-job:                  # синтетика: сильный fit, известный job < 60
   decision: clarify
-  risks: [wrong_name, onsite_other_city_1d]
-  travel_pln_per_trip: 200
+  template: low_rate
+  job_between: [40, 59]
+  fit_at_least: 70
+  counter_pln_day: 1050                # верх вилки 880/день < floor -> floor
+
+07-ai-engineer-warsaw-admin:
+  after_001:
+    decision: clarify
+    risks: [wrong_name, onsite_other_city_1d, intermediary_no_client]
+  after_002:
+    decision: skip
+    reason: admin_role_vs_builder_profile

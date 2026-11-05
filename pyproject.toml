@@ -15,6 +15,9 @@ dev = ["pytest>=8"]
 [tool.setuptools]
 packages = ["jobradar"]
 
+[tool.setuptools.package-data]
+jobradar = ["dicts/*.yaml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "tests"]

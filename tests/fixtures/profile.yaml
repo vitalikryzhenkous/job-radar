@@ -1,0 +1,36 @@
+# Синтетический профиль для тестов. Не реальные данные владельца: только то, что нужно,
+# чтобы фикстуры давали ожидаемые решения. Реальный профиль: config/profile.yaml (gitignored).
+first_name: Vitalii          # имя уже есть в обращениях фикстур
+min_rate: {amount: 1050, currency: PLN, unit: day}
+location: {city: "Poznań", country: "PL"}
+contract: {preferred: [B2B], entity: JDG}
+level: senior
+experience: {total_years: 9, ai_years: 2}
+skills:
+  - {name: TypeScript, level: strong, years: 9}
+  - {name: React, level: strong}
+  - {name: Node.js, level: core}
+  - {name: .NET, level: core}
+  - {name: SQL, level: core}
+  - {name: REST APIs, level: core}
+  - {name: CI/CD, level: core}
+  - {name: Docker, level: core}
+  - {name: AWS, level: core}
+  - {name: LLM API, level: production}
+  - {name: AI agents, level: production}
+  - {name: MCP, level: production}
+  - {name: Structured output, level: production}
+  - {name: Prompt engineering, level: production}
+  - {name: Agent evals, level: production}
+  - {name: AI coding agents, level: production}
+  - {name: Python, level: basic}
+  - {name: Anthropic API, level: basic}
+  - {name: RAG, level: pet}
+  - {name: Vector databases, level: pet}
+  - {name: LangChain, level: pet}
+  - {name: LangGraph, level: pet}
+  - {name: Fine-tuning, level: pet}
+gaps: [Java, Go]
+languages: {English: B2}
+degree: {level: master, cs: false}
+best_offer: {amount: 30, currency: USD, unit: hour}   # тестовое значение

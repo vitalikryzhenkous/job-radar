@@ -6,13 +6,27 @@ import collections
 import sys
 from pathlib import Path
 
-from . import fx, tracker
-from .config import ConfigError
+from . import fx, pipeline, tracker
+from .config import ROOT, ConfigError
 
 
-def _not_yet(_args) -> int:
-    print("Ещё не реализовано: появится в ветке feat/extract.", file=sys.stderr)
-    return 2
+def _job_dir(arg: str) -> Path:
+    p = Path(arg)
+    return p if p.is_dir() else ROOT / "jobs" / arg
+
+
+def _run(args) -> int:
+    res = pipeline.run(_job_dir(args.job_dir), fx.get_rates())
+    print(pipeline.summary(res))
+    return 0
+
+
+def _update(args) -> int:
+    d = _job_dir(args.slug)
+    p = pipeline.add_message(d, args.text, args.source)
+    print(f"Добавлено: {p.relative_to(d)}")
+    print(pipeline.summary(pipeline.run(d, fx.get_rates())))
+    return 0
 
 
 def _seed(args) -> int:
@@ -41,13 +55,14 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     run = sub.add_parser("run", help="механика шагов 2–5 и 10")
-    run.add_argument("job_dir")
-    run.set_defaults(func=_not_yet)
+    run.add_argument("job_dir", help="jobs/<slug> или просто <slug>")
+    run.set_defaults(func=_run)
 
     upd = sub.add_parser("update", help="дописать сообщение рекрутера и пересчитать")
     upd.add_argument("slug")
     upd.add_argument("text")
-    upd.set_defaults(func=_not_yet)
+    upd.add_argument("--source", default="text", help="linkedin | email | text")
+    upd.set_defaults(func=_update)
 
     sd = sub.add_parser("seed", help="засеять index.csv из CSV")
     sd.add_argument("csv")

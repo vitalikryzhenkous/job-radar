@@ -1,0 +1,19 @@
+OJ Digital
+Forward Deployed Engineer
+Соединенные Штаты Америки · 6 часов назад · Более 100 кандидатов
+От 150K USD/yr до 240K USD/yr
+Удаленная работа
+Полный рабочий день
+Простая подача заявки
+Об этой вакансии
+Forward Deployed Engineer
+📍 United States | Remote with frequent travel to customer sites
+💰 $150,000–$240,000 base salary + equity
+We're working with a venture-backed AI business looking to hire a Forward Deployed Engineer to build and deploy production AI solutions for enterprise customers.
+Key Responsibilities
+Build production LLM workflows, RAG pipelines and agentic systems.
+Build evaluations to assess accuracy, reduce hallucinations and maintain reliability as usage scales.
+What We're Looking For
+Typically 3–7 years of software, full-stack, applied AI or forward-deployed engineering experience.
+Based in the US, able to travel frequently and ideally located near a major airport. Chicago-based candidates are particularly welcome.
+Authorised to work in the US without visa sponsorship.

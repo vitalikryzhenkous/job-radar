@@ -1,0 +1,41 @@
+Forte Group
+AI Product Engineer
+Польша · 5 часов назад · 71 кандидат
+Удаленная работа
+Полный рабочий день
+3 из 6 соответствий навыков
+Простая подача заявки
+Об этой вакансии
+Forte Group is looking for an AI Product Engineer. We build products where AI is the core capability. Our AI Product Engineers work on client engagements across the US and Europe, delivering LLM-powered features, retrieval systems, agentic workflows, and fully AI-native applications into production.
+
+WHAT YOU WILL DO
+Build RAG pipelines: document ingestion, chunking strategies, embeddings, vector stores, retrieval evaluation, and re-ranking
+Integrate LLM APIs into production systems using structured outputs, function calling, and multi-model routing
+Balance real-world tradeoffs between accuracy, latency, and cost
+Develop agentic workflows with tool usage, human-in-the-loop checkpoints, and multi-agent coordination
+Build evaluation systems: automated test sets, field-level accuracy metrics, regression detection in CI/CD, and production monitoring
+Own production operations: latency optimization, cost control, drift monitoring, and incident response
+
+SKILLS & EXPERIENCE
+5+ years in software engineering
+2+ years building AI-powered features or products in production
+Strong proficiency in at least one modern backend language — e.g., Python, C#/.NET, Java/Kotlin, TypeScript/Node.js, or Go
+Experience building and shipping production services with a modern web framework (e.g., FastAPI/Django, ASP.NET Core, Spring Boot, Express/Next.js)
+Solid understanding of async/concurrent patterns, streaming (SSE/WebSockets), and batch processing
+LLM APIs: OpenAI, Anthropic, open-source models (Ollama, vLLM, or similar)
+Multi-model architectures: routing between models, tiering by cost and complexity, fallback chains
+Fine-tuning pipelines and when fine-tuning is the right approach vs. RAG or prompt engineering
+Vector databases: Pinecone, Weaviate, pgvector, Chroma, OpenSearch, or equivalent
+Hybrid search (vector + keyword/BM25), re-ranking, and retrieval evaluation methodology
+Document processing: OCR pipelines (Azure Document Intelligence or equivalent)
+LangChain, LangGraph, CrewAI, Autogen, or equivalent
+MCP (Model Context Protocol) for multi-agent coordination
+Evaluation frameworks (LangSmith, Braintrust, Ragas, or custom setups)
+Containerization and cloud deployment (AWS, Azure, or GCP)
+Data governance: PII handling, auditability, compliance
+
+What's in it for you
+Work your way — anywhere, anytime. Our remote-first approach lets you choose where and how you work best!
+
+Требования, добавленные разместившим вакансию участником
+• Опыт работы более 3 лет – Artificial Intelligence (AI)
