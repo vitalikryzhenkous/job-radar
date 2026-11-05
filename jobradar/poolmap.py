@@ -106,6 +106,41 @@ def _earlier(pool_dir: Path) -> set:
     return {d.name for p in pool_dir.parent.iterdir() if p.is_dir() and p.name < pool_dir.name for d in p.iterdir()}
 
 
+# ---------- реестр виденных: jobs/_pool/seen.yaml, ключ — slug (= ID оффера justjoin / LinkedIn), запасной — компания+роль.
+# Точное совпадение, без RAG: ID стабилен, а перевыложенную вакансию ловит компания+роль. Пулы можно удалять — реестр остаётся.
+
+def _key(company: str, role: str) -> str:
+    return re.sub(r"[^\w]+", " ", f"{company}|{role}".lower()).strip()
+
+
+def seen_registry(pool_root: Path = POOL) -> dict:
+    p = pool_root / "seen.yaml"
+    return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.is_file() else {}
+
+
+def remember(pool_dir: Path, rows_: list[dict]) -> dict:
+    """Записать вакансии пула в реестр (first/last — даты пулов). Возвращает реестр ДО записи."""
+    reg = seen_registry(pool_dir.parent)
+    before = {k: dict(v) for k, v in reg.items()}
+    for r in rows_:
+        e = reg.setdefault(r["slug"], {"first": pool_dir.name})
+        e.update(company=r["company"], role=r["role"], url=r["url"], decision=r["decision"],
+                 status=(r["status"] or {}).get("status"), first=min(e["first"], pool_dir.name),
+                 last=max(e.get("last", pool_dir.name), pool_dir.name))
+    if reg != before:
+        (pool_dir.parent / "seen.yaml").write_text(yaml.safe_dump(reg, allow_unicode=True, sort_keys=True), encoding="utf-8")
+    return before
+
+
+def _prev(r: dict, reg: dict, by_key: dict, pool: str) -> dict | None:
+    """Та же вакансия в более раннем пуле: по slug, иначе по компании+роли (перевыложена с новым ID)."""
+    e = reg.get(r["slug"]) or by_key.get(_key(r["company"], r["role"]))
+    if not e or e["first"] >= pool:
+        return None
+    old = e.get("status") == "rejected" or e.get("decision") == "skip"
+    return {"first": e["first"], "decision": e.get("decision"), "status": e.get("status"), "old_no": old}
+
+
 def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8") if p.is_file() else ""
 
@@ -165,10 +200,15 @@ def data(pool_dir: Path | None = None, profile: dict | None = None) -> dict:
     pool_dir = pool_dir or latest()
     profile = profile or load_profile()
     home = profile.get("location", {}).get("city", "")
+    rs = rows(pool_dir, profile)
+    reg = remember(pool_dir, rs)
+    by_key = {_key(v.get("company", ""), v.get("role", "")): v for v in reg.values()}
+    for r in rs:
+        r["prev"] = _prev(r, reg, by_key, pool_dir.name)
     return {"date": pool_dir.name, "home": ALIAS.get(home, home), "cities": CITY_XY,
             "pools": sorted((p.name for p in POOL.iterdir() if p.is_dir()), reverse=True) if POOL.is_dir() else [],
             "skills": skills_mod.listing(profile), "levels": skills_mod.LEVELS, "statuses": STATUSES,
-            "api": None, "rows": rows(pool_dir, profile)}
+            "api": None, "rows": rs}
 
 
 def html(d: dict) -> str:

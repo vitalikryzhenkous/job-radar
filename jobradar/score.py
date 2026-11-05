@@ -210,7 +210,7 @@ def decide(ex: dict, flags: dict, fit: float, job: float | None, coverage: float
         return "stop_scam", flags["scam"][0]["code"]
     if flags["blockers"]:
         b = flags["blockers"][0]
-        return "skip", b["evidence"] if b["code"] in ("admin_role", "non_dev_role", "polish_above_max") else b["code"]
+        return "skip", b["evidence"] if b["code"] in ("admin_role", "non_dev_role", "polish_above_max", "english_above_max", "onsite_over_max") else b["code"]
     if dups:
         return "duplicate", f"{dups[0]['by']}: {dups[0]['slug']}"
     if ex["source_kind"] == "outreach" and ex["missing"]:
@@ -218,11 +218,15 @@ def decide(ex: dict, flags: dict, fit: float, job: float | None, coverage: float
     if job is None or coverage < D["min_coverage"]:
         # данных о вакансии мало: решаем по fit, остальное на звонке
         if fit >= D["apply"]["fit"]:
+            if hy := next((r for r in flags["risks"] if r["code"] == "hybrid_days_unknown"), None):
+                return "clarify", hy["evidence"] + " — спросить (допустимо до 1/нед)"
             return "apply", f"fit {fit:.0f}, job н/д (coverage {coverage:.0%}), остальное на звонке"
         if fit < D["skip_below"]:
             return "skip", f"fit {fit:.0f} < {D['skip_below']}, job н/д"
         return "clarify", f"fit {fit:.0f}, job н/д (coverage {coverage:.0%})"
     if fit >= D["apply"]["fit"] and job >= D["apply"]["job"]:
+        if hy := next((r for r in flags["risks"] if r["code"] == "hybrid_days_unknown"), None):
+            return "clarify", hy["evidence"] + " — спросить (допустимо до 1/нед)"
         return "apply", "оба порога пройдены"
     if job < D["job_skip_below"]:
         return "skip", f"job {job:.0f} < {D['job_skip_below']}"

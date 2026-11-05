@@ -79,3 +79,22 @@ def test_api_guards(server):
     assert job.started.startswith("https://justjoin.it/")
     for bad in ("../etc", "..", "2026-11-05/../.."):
         assert post(port, "/api/move", {"slug": "x", "decision": "apply", "pool": bad})[0] == 400
+
+
+def test_seen_registry(tmp_path):
+    a, b = tmp_path / "2026-11-01", tmp_path / "2026-11-05"
+    a.mkdir(), b.mkdir()
+    old = [{"slug": "acme-dev", "company": "Acme", "role": "AI Dev", "url": "u1", "decision": "skip", "status": None},
+           {"slug": "beta-dev", "company": "Beta", "role": "Dev", "url": "u2", "decision": "apply", "status": {"status": "rejected"}}]
+    poolmap.remember(a, old)
+    new = [{"slug": "acme-dev-2", "company": "ACME", "role": "AI  Dev", "url": "u3", "decision": "apply", "status": None},
+           {"slug": "gamma-dev", "company": "Gamma", "role": "Dev", "url": "u4", "decision": "apply", "status": None},
+           {"slug": "beta-dev", "company": "Beta", "role": "Dev", "url": "u2", "decision": "apply", "status": None}]
+    reg = poolmap.remember(b, new)
+    keys = {poolmap._key(v["company"], v["role"]): v for v in reg.values()}
+    got = {r["slug"]: poolmap._prev(r, reg, keys, b.name) for r in new}
+    assert got["acme-dev-2"]["old_no"] and got["acme-dev-2"]["first"] == "2026-11-01"     # перевыложена: по компании+роли
+    assert got["beta-dev"]["old_no"] and got["gamma-dev"] is None
+    after = poolmap.seen_registry(tmp_path)
+    assert after["beta-dev"]["first"] == "2026-11-01" and after["beta-dev"]["last"] == "2026-11-05"
+    assert poolmap.remember(b, new) == after                                                 # повтор — без изменений
