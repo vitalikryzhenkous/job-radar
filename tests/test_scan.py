@@ -106,3 +106,42 @@ def test_scan_only_justjoin(tmp_path):
         with pytest.raises(ValueError):
             scan.scan(bad, {}, out=tmp_path, get=lambda u: (_ for _ in ()).throw(AssertionError("сеть")), profile={})
     assert not any(tmp_path.iterdir())
+
+
+def test_site_of():
+    import pytest
+    from jobradar.scan import site_of
+    assert site_of("https://justjoin.it/job-offer/acme-ai-dev-warszawa-ai") == "justjoin"
+    assert site_of("https://nofluffjobs.com/pl/job/frontend-developer-acme-remote/") == "nofluff"
+    for bad in ("https://www.linkedin.com/jobs/view/123", "http://nofluffjobs.com/pl/job/x",
+                "https://nofluffjobs.com/pl/posting/x", "https://nofluffjobs.com/pl/job/job/x",
+                "https://nofluffjobs.com.evil.io/pl/job/x", "https://justjoin.it:8443/job-offer/x",
+                "https://justjoin.it/job-offers/all-locations"):
+        with pytest.raises(ValueError):
+            site_of(bad)
+
+
+NFJ_PAGE = """<script type="application/ld+json">[{"@type":"Organization","name":"Board"},
+{"@type":"JobPosting","title":"Frontend Developer","description":"<p>Angular app for a bank.</p><ul><li>Angular 3+ years</li></ul>",
+ "employmentType":"CONTRACTOR","jobLocationType":"TELECOMMUTE","hiringOrganization":{"name":"Acme"},
+ "baseSalary":{"currency":"PLN","value":{"value":150,"unitText":"Hour"}},
+ "skills":[{"value":"Angular","type":"main"},{"value":"TypeScript","type":"main"},{"value":"Jest","type":"nice"}]}]</script>"""
+
+
+def test_collect_nofluff(tmp_path):
+    import pytest
+    from helpers import FX, PROFILE
+    from jobradar import scan
+    calls = []
+    get = lambda u: calls.append(u) or NFJ_PAGE
+    urls = ["https://nofluffjobs.com/pl/job/frontend-developer-acme-remote?utm=x",
+            "https://nofluffjobs.com/pl/job/frontend-developer-acme-remote/"]
+    got = scan.collect(urls, FX, profile=PROFILE, out=tmp_path, get=get, delay=0, log=lambda s: None,
+                       index_path=tmp_path / "index.csv")
+    assert len(calls) == 1 and sum(got.values()) == 1                  # дубль с utm и слэшем — одна вакансия
+    raw = (tmp_path / "frontend-developer-acme-remote" / "raw" / "001-nofluff.txt").read_text(encoding="utf-8")
+    assert raw.splitlines()[:2] == ["Acme", "Frontend Developer"]
+    assert "Salary: 150 - 150 PLN/hour (B2B)" in raw and "Requirements (must): Angular, TypeScript" in raw
+    with pytest.raises(ValueError):                                     # одна чужая ссылка — отказ до сети
+        scan.collect([urls[0], "https://www.linkedin.com/jobs/view/1"], FX, profile=PROFILE, out=tmp_path,
+                     get=lambda u: (_ for _ in ()).throw(AssertionError("сеть")), delay=0)
