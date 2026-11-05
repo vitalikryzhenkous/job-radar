@@ -159,22 +159,28 @@ def to_pln_day(amount: dict, fx: dict) -> float:
     return r["pln_day"][0]
 
 
-def money_advice(ex: dict, profile: dict, fx: dict, money: dict) -> dict:
+def money_advice(ex: dict, profile: dict, fx: dict, money: dict, counter: bool = False) -> dict:
     rate = ex["rate"]
     out = {"below_market": None, "below_best_offer": None, "counter_pln_day": None, "floor_pln_day": None}
     if not rate:
-        return out
+        return {**out, **counter_offer(ex, profile, fx, money)} if counter else out
     mk = money["market"]
     out["below_market"] = money["effective_pln_h"] < mk["min"]
     if best := profile.get("best_offer"):
         best_h = to_pln_day(best, fx) / HOURS_PER_DAY
         out["below_best_offer"] = rate["pln_h"][1] < best_h
-    if out["below_market"]:
-        floor = to_pln_day(profile["min_rate"], fx) if profile.get("min_rate") else None
-        counter = round(rate["pln_day"][1] / 50) * 50
-        out["floor_pln_day"] = round(floor) if floor else None
-        out["counter_pln_day"] = max(counter, out["floor_pln_day"] or 0)
+    if out["below_market"] or counter:
+        out.update(counter_offer(ex, profile, fx, money))
     return out
+
+
+def counter_offer(ex: dict, profile: dict, fx: dict, money: dict) -> dict:
+    """Контрпредложение: верх названной вилки (или рыночный минимум, если ставки нет), не ниже floor.
+    Округление до 50 PLN/день."""
+    floor = round(to_pln_day(profile["min_rate"], fx)) if profile.get("min_rate") else None
+    rate = ex["rate"]
+    base = rate["pln_day"][1] if rate else money["market"]["min"] * HOURS_PER_DAY
+    return {"floor_pln_day": floor, "counter_pln_day": max(round(base / 50) * 50, floor or 0)}
 
 
 # ---------- итог
@@ -218,12 +224,23 @@ def decide(ex: dict, flags: dict, fit: float, job: float | None, coverage: float
         return "clarify", f"fit {fit:.0f}, job н/д (coverage {coverage:.0%})"
     if fit >= D["apply"]["fit"] and job >= D["apply"]["job"]:
         return "apply", "оба порога пройдены"
+    if job < D["job_skip_below"]:
+        return "skip", f"job {job:.0f} < {D['job_skip_below']}"
     if fit < D["skip_below"] and job < D["skip_below"]:
         return "skip", "оба балла < порога"
+    if fit >= D["apply"]["fit"]:
+        return "clarify", f"fit {fit:.0f}, job {job:.0f} < {D['apply']['job']}: торг по ставке"
     return "clarify", "пограничные баллы"
 
 
-def template(decision: str, ex: dict, flags: dict, adv: dict) -> str | None:
+def needs_counter(decision: str, fit: float, job: float | None, weights: dict) -> bool:
+    """Известный job ниже порога apply при сильном fit -> контрпредложение (low_rate)."""
+    D = weights["decision"]
+    return decision == "clarify" and job is not None and fit >= D["apply"]["fit"] \
+        and D["job_skip_below"] <= job < D["apply"]["job"]
+
+
+def template(decision: str, ex: dict, flags: dict, adv: dict, counter: bool = False) -> str | None:
     if decision == "stop_scam":
         return "scam"
     if decision == "duplicate":
@@ -232,7 +249,9 @@ def template(decision: str, ex: dict, flags: dict, adv: dict) -> str | None:
         return "empty"
     if decision == "skip":
         return "mismatch"
-    if adv["below_market"]:
+    if any(r["code"] == "rtr_request" for r in flags["risks"]):
+        return "rtr"
+    if adv["below_market"] or counter:
         return "low_rate"
     if any(r["code"] == "intermediary_no_client" for r in flags["risks"]):
         return "intermediary"
@@ -249,6 +268,45 @@ def call_notes(ex: dict, profile: dict) -> list[str]:
     if ex["poster"]["type"] == "intermediary" and not ex["client_named"]:
         notes.append("спросить имя клиента")
     return notes
+
+
+SIGN_DOMAINS = {"docusign.com", "docusign.net", "adobesign.com", "echosign.com", "adobe.com"}
+
+
+def pre_rtr(ex: dict, flags: dict, adv: dict, profile: dict, fx: dict) -> dict | None:
+    """Чек-лист перед подписью RTR. status: ok | fail | check (проверить в тексте RTR вручную)."""
+    if not any(r["code"] == "rtr_request" for r in flags["risks"]):
+        return None
+    sub = ex.get("submission") or {}
+    rate = to_pln_day(sub["rate"], fx) if sub.get("rate") else (ex["rate"]["pln_day"][1] if ex["rate"] else None)
+    floor = adv["floor_pln_day"] or (round(to_pln_day(profile["min_rate"], fx)) if profile.get("min_rate") else None)
+    links, own = ex["rtr"]["link_domains"], ex["rtr"]["poster_domains"]
+    bad = [d for d in links if d not in own and d not in SIGN_DOMAINS]
+    items = [
+        {"item": "клиент назван", "status": "ok" if ex["client_named"] else "fail",
+         "evidence": ex.get("client")},
+        {"item": "ставка >= floor", "status": "check" if rate is None or floor is None else
+         "ok" if rate >= floor else "fail",
+         "evidence": None if rate is None else f"{round(rate)} PLN/день, floor {floor}"},
+        {"item": "эксклюзив только на эту роль и <= 90 дней", "status": "check", "evidence": None},
+        {"item": "нет backout fee и запрета работать с клиентом через других", "status": "check", "evidence": None},
+        {"item": "ссылка: домен посредника или DocuSign/Adobe Sign",
+         "status": "check" if not links else "fail" if bad else "ok", "evidence": ", ".join(links) or None},
+    ]
+    fixes = [f"исправить до RTR: {r['evidence']}" for r in flags["risks"] if r["code"] == "submission_mismatch"]
+    blocked = [i["item"] for i in items if i["status"] == "fail"]
+    variant = "rate_first" if blocked or adv["below_market"] else "sign_with_fixes"
+    return {"checklist": items, "fixes": fixes, "failed": blocked, "variant": variant}
+
+
+def money_note(adv: dict) -> str | None:
+    if adv["below_market"] and adv["below_best_offer"]:
+        return "ставка ниже рынка и лучшего оффера"
+    if adv["below_market"]:
+        return "ставка ниже рынка"
+    if adv["below_best_offer"]:
+        return "ставка ниже лучшего оффера"
+    return None
 
 
 def job_label(sc: dict) -> str:
@@ -269,14 +327,20 @@ def score(ex: dict, flags: dict, dups: list, profile: dict, weights: dict, marke
     if flags["blockers"]:
         fit, job = 0, (0 if job is not None else None)
     decision, reason = decide(ex, flags, fit, job, coverage, dups, weights)
-    adv = money_advice(ex, profile, fx, money)
+    counter = needs_counter(decision, fit, job, weights)
+    adv = money_advice(ex, profile, fx, money, counter)
+    rtr = pre_rtr(ex, flags, adv, profile, fx)
+    if rtr and decision == "apply" and (rtr["failed"] or rtr["fixes"]):
+        decision, reason = "clarify", "до RTR: " + "; ".join(rtr["failed"] + rtr["fixes"])
     research = decision in ("apply", "clarify") and fit >= D["research_min"] \
         and (job is None or job >= D["research_min"]) and bool(ex["missing"])
     return {
         "fit": fit, "job": job, "coverage": coverage,
         "fit_parts": fit_parts, "job_parts": job_parts, "penalties": pen,
         "decision": decision, "reason": reason,
-        "template": template(decision, ex, flags, adv),
+        "template": template(decision, ex, flags, adv, counter),
+        "pre_rtr": rtr,
+        "money_note": money_note(adv),
         "call_notes": call_notes(ex, profile) if decision == "apply" else [],
         "research_needed": research,
         "missing": ex["missing"],

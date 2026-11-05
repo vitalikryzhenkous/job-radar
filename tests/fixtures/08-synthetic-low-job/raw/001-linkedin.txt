@@ -1,0 +1,16 @@
+Northwind Labs
+Senior AI Engineer
+Poznań, Poland · Remote
+Synthetic fixture: strong fit, known job below the apply threshold.
+About the job
+Northwind Labs builds AI agents for logistics customers. We are hiring a Senior AI Engineer for our product team.
+Requirements
+5+ years of commercial software development experience.
+TypeScript and Node.js in production.
+React for internal tools.
+Experience building AI agents with LLM APIs and structured output.
+REST APIs and SQL.
+Offer
+B2B contract, 100 - 110 PLN/h net.
+Fully remote within Poland.
+Recruitment process: 5 stages.

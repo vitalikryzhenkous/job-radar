@@ -24,6 +24,7 @@ TECH = {k: [re.compile(p, I) for p in v] for k, v in _load("tech.yaml").items()}
 _PLACES = _load("places.yaml")
 CITIES = {k: re.compile("|".join(v), I) for k, v in _PLACES["cities"].items()}
 COUNTRIES = {k: re.compile("|".join(v), I) for k, v in _PLACES["countries"].items()}
+SERVICE_COS = {k: re.compile("|".join(v), I) for k, v in _load("service_companies.yaml").items()}
 
 ALT = re.compile(r"\bat least one\b|\be\.g\.|\bor (equivalent|similar)\b|\bsuch as\b|\bany of\b", I)
 PARENS = re.compile(r"\([^)]*\)")
@@ -64,6 +65,12 @@ RATE_FROM_TO = re.compile(
 STAGES = re.compile(r"(\d+)\s*(?:-|–)?\s*(?:stage|round|step)s?\b", I)
 ONSITE_DAYS = re.compile(r"\b(once|one|1|twice|two|2|three|3|four|4)\s*(?:days?|times?)?\s*(?:a|per)\s*weeks?\b", I)
 SCREEN_Q = re.compile(r"(\d+)\s+hard requirements", I)
+CLIENT = re.compile(r"^\s*(?:end\s+)?client\s*(?:name)?\s*[:\-–]\s*(.+?)\s*$", I | re.M)
+RTR = re.compile(r"right to represent|\bRTR\b", I)
+URL = re.compile(r"https?://(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})", I)
+SUBMISSION = re.compile(r"submission summary|candidate summary|submitted your profile", I)
+LTD = re.compile(r"(?:own\s+)?(?:limited|ltd\.?)\s+company\s*[:\-–]\s*(yes|no)\b", I)
+SUB_RATE = re.compile(r"^\s*rate\s*[:\-–]\s*(\d[\d,.]*)\s*(PLN|EUR|USD|zł|zl|\$|€)\s*/\s*(day|d|hour|h|hr|month)\b", I | re.M)
 NUM = {"once": 1, "one": 1, "twice": 2, "two": 2, "three": 3, "four": 4}
 CUR = {"$": "USD", "€": "EUR", "zł": "PLN", "zl": "PLN"}
 UNIT = {"h": "hour", "hr": "hour", "d": "day", "mo": "month", "yr": "year"}
@@ -175,6 +182,37 @@ def _company_role(n: Normalized) -> tuple[str | None, str | None]:
     return company, role
 
 
+def _domain(d: str) -> str:
+    return ".".join(d.lower().split(".")[-2:])
+
+
+def parse_rtr(n: Normalized, poster: str | None) -> dict:
+    """RTR-запрос: домены ссылок в письме с RTR и домены посредника из остальных писем."""
+    msgs = [m for m in n.messages if RTR.search("\n".join(m.lines))]
+    links = sorted({_domain(d) for m in msgs for d in URL.findall("\n".join(m.lines))})
+    word = (poster or "").split()[0].lower() if poster else ""
+    own = sorted({_domain(d) for d in URL.findall(n.text()) if word and word in d.lower()})
+    return {"requested": bool(msgs), "link_domains": links, "poster_domains": own}
+
+
+def parse_submission(n: Normalized) -> dict | None:
+    """Submission summary от посредника: что он собирается отправить клиенту."""
+    m = next((m for m in n.messages if SUBMISSION.search("\n".join(m.lines))), None)
+    if not m:
+        return None
+    t = "\n".join(m.lines)
+    rate = None
+    if r := SUB_RATE.search(t):
+        cur = CUR.get(r[2].lower(), CUR.get(r[2], r[2].upper()))
+        rate = {"amount": _amount(r[1]), "currency": cur, "unit": UNIT.get(r[3].lower(), r[3].lower()),
+                "evidence": r.group(0).strip()}
+    ltd = LTD.search(t)
+    client = CLIENT.search(t)
+    return {"message": m.name, "ltd": (ltd[1].lower() == "yes") if ltd else None,
+            "ltd_evidence": ltd.group(0).strip() if ltd else None,
+            "rate": rate, "client": client[1] if client else None}
+
+
 def role_class(role: str | None, text: str) -> str:
     if ADMIN.search(text):
         return "admin"
@@ -229,12 +267,20 @@ def extract(n: Normalized, fx: dict, on: dt.date | None = None) -> dict:
     hours = parse_hours(text, on)
     polish = "must" if POLISH_HI.search(req_text) else "nice" if POLISH_HI.search("\n".join(nice)) else None
 
+    client = CLIENT.search(text)
+    client = client[1].strip() if client else None
+    chain = next((k for k, p in SERVICE_COS.items() if client and p.search(client)), None)
+
     data = {
         "job_id": jid,
         "company": company,
         "poster": {"type": "intermediary" if intermediary else ("employer" if company else "unknown"),
                    "name": company},
-        "client_named": False if intermediary else None,
+        "client_named": bool(client) if intermediary else None,
+        "client": client,
+        "client_is_service_co": chain,
+        "rtr": parse_rtr(n, company),
+        "submission": parse_submission(n),
         "source_kind": "outreach" if n.outreach else "posting",
         "greeting_names": [m.greeting_name for m in n.messages if m.greeting_name],
         "role": role,
@@ -261,5 +307,13 @@ def extract(n: Normalized, fx: dict, on: dt.date | None = None) -> dict:
            "location": remote or cities or countries}
     if intermediary:
         key["client"] = data["client_named"]
+    sub = data["submission"]
+    if sub and sub["rate"]:
+        # submission summary — последняя конкретная ставка, она главнее вилки из ранних писем
+        r = sub["rate"]
+        data["rate"] = rate = {"min": r["amount"], "max": r["amount"], "currency": r["currency"], "unit": r["unit"],
+                               "gross_vat": bool(re.search(r"\+\s*vat", text, I)), "evidence": r["evidence"],
+                               **normalize_rate(r["amount"], None, r["currency"], r["unit"], fx)}
+        key["rate"] = rate
     data["missing"] = [k for k in ("rate", "contract", "client", "role", "location") if k in key and not key[k]]
     return data

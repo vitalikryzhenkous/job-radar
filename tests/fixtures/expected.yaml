@@ -33,6 +33,20 @@
     decision: clarify
     truncated: true
     screen_questions: 2
+  after_004:                           # RTR-запрос, клиента ещё нет
+    decision: clarify
+    template: rtr
+    pre_rtr_failed: ["клиент назван"]
+  after_005:                           # submission summary: Hexaware Europe, 1100 PLN/день, Ltd: Yes
+    decision: clarify
+    risks: [hours_after_18, cs_degree_required, truncated, intermediary_chain, rtr_request, submission_mismatch]
+    missing: []
+    below_market: true                 # floor 1050 не нарушен: 1100 >= 1050 (решение владельца)
+    money_note: "ставка ниже рынка"    # в тестовом профиле best_offer $30 ≈ 938 PLN/день; в реальном ($40) — «и лучшего оффера»
+    template: rtr
+    pre_rtr_variant: rate_first
+    pre_rtr_failed: []
+    pre_rtr_fixes: ["исправить до RTR: Own Limited Company: Yes -> JDG"]
 
 05-empty-outreach:
   decision: clarify
@@ -41,6 +55,13 @@
 06-us-only-fde:
   decision: skip
   blockers: [us_only]                  # Authorised to work in the US
+
+08-synthetic-low-job:                  # синтетика: сильный fit, известный job < 60
+  decision: clarify
+  template: low_rate
+  job_between: [40, 59]
+  fit_at_least: 70
+  counter_pln_day: 1050                # верх вилки 880/день < floor -> floor
 
 07-ai-engineer-warsaw-admin:
   after_001:

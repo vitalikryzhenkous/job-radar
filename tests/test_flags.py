@@ -9,7 +9,7 @@ from helpers import FX, ON, PROFILE, raw
 def run(slug, upto=None):
     n = normalize(raw(slug, upto))
     e = extract(n, FX, ON)
-    return e, fl.check(e, PROFILE, n.text())
+    return e, fl.check(e, PROFILE, n.text(), FX)
 
 
 def codes(items):
@@ -62,3 +62,20 @@ def test_duplicates():
     # своя строка: повторный прогон — не дубль, первый прогон по уже поданной — дубль
     assert fl.duplicates(e2, idx2, "forte-group-ai-product-engineer", False) == []
     assert fl.duplicates(e2, idx2, "forte-group-ai-product-engineer", True)
+
+
+def test_rtr_chain_and_submission():
+    e, f = run("04-avance-ai-fullstack", 5)
+    assert e["client"] == "Hexaware Europe" and e["client_is_service_co"] == "Hexaware"
+    assert {"intermediary_chain", "rtr_request", "submission_mismatch"} <= set(codes(f["risks"]))
+    assert "intermediary_no_client" not in codes(f["risks"])          # клиент назван в 005
+    assert e["rtr"]["link_domains"] == ["avanceservices.com"]
+    assert e["rate"]["pln_day"] == [1100.0, 1100.0]                    # ставка из submission главнее вилки
+
+
+def test_submission_rate_below_floor():
+    e, _ = run("04-avance-ai-fullstack", 5)
+    e = copy.deepcopy(e)
+    e["submission"]["rate"] = {"amount": 900, "currency": "PLN", "unit": "day", "evidence": "Rate: 900 PLN/Day"}
+    e["submission"]["ltd"] = False
+    assert fl.submission_mismatch(e, PROFILE, FX) == ["ставка 900 PLN/день < floor 1050"]

@@ -1,0 +1,16 @@
+# Сервисные / аутсорс-компании. Если посредник подаёт к ним, а не к конечному клиенту -> intermediary_chain.
+# Ключ — каноническое имя, значение — regex (без учёта регистра).
+Hexaware: ["hexaware"]
+Infosys: ["infosys"]
+TCS: ["\\btcs\\b", "tata consultancy"]
+Wipro: ["wipro"]
+Cognizant: ["cognizant"]
+Capgemini: ["capgemini"]
+HCLTech: ["\\bhcl(tech)?\\b"]
+Tech Mahindra: ["tech mahindra"]
+Accenture: ["accenture"]
+LTIMindtree: ["ltimindtree", "\\blti\\b", "mindtree"]
+Mphasis: ["mphasis"]
+NTT Data: ["ntt data"]
+Virtusa: ["virtusa"]
+Persistent: ["persistent systems"]

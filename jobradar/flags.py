@@ -28,7 +28,29 @@ def _end_after(hours: dict | None, limit: str = "18:00") -> bool:
     return bool(hours) and hours["end"] > limit
 
 
-def check(ex: dict, profile: dict, text: str = "") -> dict:
+def floor_pln_day(profile: dict, fx: dict | None) -> float | None:
+    from .score import to_pln_day
+    return round(to_pln_day(profile["min_rate"], fx)) if fx and profile.get("min_rate") else None
+
+
+def submission_mismatch(ex: dict, profile: dict, fx: dict | None) -> list[str]:
+    """Что в submission summary расходится с профилем: форма бизнеса, ставка ниже floor."""
+    sub = ex.get("submission")
+    if not sub:
+        return []
+    out = []
+    entity = profile.get("contract", {}).get("entity")
+    if sub["ltd"] and entity and entity.lower() not in ("ltd", "sp. z o.o.", "limited company"):
+        out.append(f"{sub['ltd_evidence']} -> {entity}")
+    if sub["rate"] and (floor := floor_pln_day(profile, fx)):
+        from .score import to_pln_day
+        day = to_pln_day(sub["rate"], fx)
+        if day < floor:
+            out.append(f"ставка {round(day)} PLN/день < floor {floor}")
+    return out
+
+
+def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> dict:
     """Возвращает {blockers, risks, scam}. Дубли — отдельно: duplicates()."""
     blockers, risks, scam = [], [], []
     city = profile["location"]["city"].lower()
@@ -79,6 +101,13 @@ def check(ex: dict, profile: dict, text: str = "") -> dict:
         risks.append(_risk("wrong_name", f"Hi {wrong[0]}"))
     if other_city and days in (1, 2) and loc["remote"] == "hybrid":
         risks.append(_risk(f"onsite_other_city_{days}d", f"{other_city[0]}: {days} d/week"))
+
+    if ex["poster"]["type"] == "intermediary" and ex.get("client_is_service_co"):
+        risks.append(_risk("intermediary_chain", f"{ex['poster']['name'] or 'recruiter'} -> {ex['client']}"))
+    if ex.get("rtr", {}).get("requested"):
+        risks.append(_risk("rtr_request", ", ".join(ex["rtr"]["link_domains"]) or "без ссылки"))
+    if mism := submission_mismatch(ex, profile, fx):
+        risks.append(_risk("submission_mismatch", "; ".join(mism)))
 
     # --- скам
     for code, pat in SCAM.items():

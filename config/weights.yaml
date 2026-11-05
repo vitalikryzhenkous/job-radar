@@ -32,6 +32,9 @@ risks:
   wrong_name:             {penalty: -5,  target: job}   # чужое имя = массовая рассылка
   onsite_other_city_1d:   {penalty: -5,  target: job}
   onsite_other_city_2d:   {penalty: -10, target: job}
+  intermediary_chain:     {penalty: -5,  target: job}   # посредник подаёт в сервисную компанию, не конечному клиенту
+  rtr_request:            {penalty: 0,   target: job}   # чек-лист перед подписью в score.pre_rtr
+  submission_mismatch:    {penalty: 0,   target: job}   # submission расходится с профилем -> исправить до RTR
 
 # Блокеры: балл 0, решение skip.
 blockers:
@@ -47,6 +50,7 @@ blockers:
 decision:
   apply: {fit: 70, job: 60}      # оба порога -> apply
   skip_below: 50                 # оба < 50 -> skip
+  job_skip_below: 40             # известный job < 40 -> skip; 40..apply.job при fit >= apply.fit -> clarify + low_rate
   research_min: 50               # исследование, если оба >= 50 и есть missing
   key_fields: [rate, contract, client, role, location]   # outreach без любого -> clarify
   # job = сумма известных частей / их максимум × 100; coverage = доля известных весов.

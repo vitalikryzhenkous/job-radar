@@ -3,7 +3,7 @@
 first_name: Vitalii          # имя уже есть в обращениях фикстур
 min_rate: {amount: 1050, currency: PLN, unit: day}
 location: {city: "Poznań", country: "PL"}
-contract: {preferred: [B2B]}
+contract: {preferred: [B2B], entity: JDG}
 level: senior
 experience: {total_years: 9, ai_years: 2}
 skills:

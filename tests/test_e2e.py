@@ -62,6 +62,12 @@ def test_case(tmp_path, slug, upto, index, exp):
         "reason": lambda v: sc["reason"] == v,
         "job": lambda v: sc["job"] == v,
         "coverage_below": lambda v: sc["coverage"] < v,
+        "job_between": lambda v: sc["job"] is not None and v[0] <= sc["job"] <= v[1],
+        "fit_at_least": lambda v: sc["fit"] >= v,
+        "money_note": lambda v: sc["money_note"] == v,
+        "pre_rtr_variant": lambda v: sc["pre_rtr"]["variant"] == v,
+        "pre_rtr_failed": lambda v: sc["pre_rtr"]["failed"] == v,
+        "pre_rtr_fixes": lambda v: sc["pre_rtr"]["fixes"] == v,
     }
     for key, v in exp.items():
         if key == "decision":
@@ -73,7 +79,7 @@ def test_case(tmp_path, slug, upto, index, exp):
 def test_outputs_written_and_index_updated(tmp_path):
     r = _run(tmp_path, "02-forte-ai-product-engineer", None, "empty")
     jd = tmp_path / "02-forte-ai-product-engineer"
-    for name in ("jd.md", "extract.json", "flags.json", "score.json"):
+    for name in ("jd.md", "extract.json", "flags.json", "score.json", "verdict.md", "reply.md"):
         assert (jd / name).is_file()
     rows = (tmp_path / "index.csv").read_text(encoding="utf-8")
     assert "02-forte-ai-product-engineer" in rows and r["score"]["decision"] in rows
@@ -92,3 +98,19 @@ def test_add_message(tmp_path):
     (jd / "raw").mkdir(parents=True)
     (jd / "raw" / "001-email.txt").write_text("Hi", encoding="utf-8")
     assert pipeline.add_message(jd, "rate 1000 PLN/day").name == "002-text.txt"
+
+
+def test_verdict_lists_unscored_job_risks(tmp_path):
+    _run(tmp_path, "03-inviso-applied-ai", None, "empty")
+    v = (tmp_path / "03-inviso-applied-ai" / "verdict.md").read_text(encoding="utf-8")
+    assert "не учтено в балле: intermediary_no_client −10" in v
+
+
+def test_verdict_and_reply_rtr(tmp_path):
+    _run(tmp_path, "04-avance-ai-fullstack", 5, "seeded_index")
+    jd = tmp_path / "04-avance-ai-fullstack"
+    v = (jd / "verdict.md").read_text(encoding="utf-8")
+    assert "не учтено в балле" not in v                    # job известен
+    assert "Перед подписью RTR" in v and "исправить до RTR" in v
+    reply = (jd / "reply.md").read_text(encoding="utf-8")
+    assert "Own Limited Company: Yes" in reply and "JDG" in reply and "{" not in reply

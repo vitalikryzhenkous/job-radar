@@ -55,7 +55,7 @@ def test_avance_steps():
     e1 = ex("04-avance-ai-fullstack", 1)
     assert e1["missing"] == ["rate", "client"] and e1["degree"]["required"]
     assert e1["role"] == "AI Fullstack Developer" and e1["contract"] == ["B2B"]
-    e3 = ex("04-avance-ai-fullstack")
+    e3 = ex("04-avance-ai-fullstack", 3)
     assert e3["rate"]["pln_h"] == [125.0, 137.5] and e3["screen_questions"] == 2
 
 
