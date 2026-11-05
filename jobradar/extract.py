@@ -165,7 +165,8 @@ def _company_role(n: Normalized) -> tuple[str | None, str | None]:
         return any(c.search(s) for c in (*COUNTRIES.values(), *CITIES.values()))
 
     if not n.outreach and len(head) >= 2:
-        if len(head) >= 3 and is_place(head[2]) and not is_place(head[0]):
+        # «ASTEK Polska» — компания со страной в названии; строка-локация обычно с «,» или «·»
+        if len(head) >= 3 and is_place(head[2]) and not (is_place(head[0]) and re.search(r"[,·]", head[0])):
             return head[0], _clean_role(head[1])
         if is_place(head[1]):
             return None, _clean_role(head[0])
@@ -213,10 +214,17 @@ def parse_submission(n: Normalized) -> dict | None:
             "rate": rate, "client": client[1] if client else None}
 
 
+NON_DEV = re.compile(r"\banalyst\b|\bconsultant\b|\bstrategist\b|product (owner|manager)|project manager|"
+                     r"scrum master|delivery manager|account manager|recruit|\bsales\b|pre-?sales|annotator|\btrainer\b", I)
+DEV = re.compile(r"engineer|developer|architect|programmer|\bml\b|scientist", I)
+
+
 def role_class(role: str | None, text: str) -> str:
     if ADMIN.search(text):
         return "admin"
     r = (role or "").lower()
+    if NON_DEV.search(r) and not DEV.search(r):        # по названию роли, не по тексту
+        return "non_dev"
     if re.search(r"forward deployed|applied ai|ai product engineer|\bai engineer\b|llm engineer|genai engineer", r):
         return "fde_applied_ai"
     if re.search(r"full ?-?stack", r):

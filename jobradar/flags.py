@@ -77,6 +77,8 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
         blockers.append(_risk("onsite_other_city_3d", f"{other_city[0]}: {days or 'full'} d/week"))
     if ex["role_class"] == "admin":
         blockers.append(_risk("admin_role", "admin_role_vs_builder_profile"))
+    if ex["role_class"] == "non_dev":
+        blockers.append(_risk("non_dev_role", f"не разработка: {ex['role']}"))
 
     # --- риски
     if ex["poster"]["type"] == "intermediary" and not ex["client_named"]:
