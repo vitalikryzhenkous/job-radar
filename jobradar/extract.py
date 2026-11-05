@@ -200,6 +200,8 @@ def _company_role(n: Normalized) -> tuple[str | None, str | None]:
     def is_place(s: str) -> bool:
         return any(c.search(s) for c in (*COUNTRIES.values(), *CITIES.values()))
 
+    if not n.outreach and len(head) >= 4 and head[3].startswith("Source: "):
+        return head[0], _clean_role(head[1])           # шапка jr scan/collect: компания, роль, место, Source (место бывает «· Remote»)
     if not n.outreach and len(head) >= 2:
         # «ASTEK Polska» — компания со страной в названии; строка-локация обычно с «,» или «·»
         if len(head) >= 3 and is_place(head[2]) and not (is_place(head[0]) and re.search(r"[,·]", head[0])):
