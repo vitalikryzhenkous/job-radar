@@ -4,6 +4,8 @@
   jr <slug>        новое письмо по вакансии (можно начало слага) + пересчёт
   jr show <slug>   показать verdict и черновик ответа без пересчёта
   jr ls            список вакансий
+  jr scan <url>    пул с justjoin.it (до 50, пауза 2 с) -> jobs/_pool/<дата>/pool.md, index.csv не меняется
+  jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import fx, pipeline, tracker
+from . import fx, pipeline, scan, tracker
 from .config import ROOT, ConfigError
 from .extract import extract
 from .normalize import normalize
@@ -52,7 +54,7 @@ def new_slug(text: str, rates: dict) -> str:
 def find(name: str) -> Path:
     if (JOBS / name).is_dir():
         return JOBS / name
-    hits = sorted(p for p in JOBS.iterdir() if p.is_dir() and name.lower() in p.name)
+    hits = sorted(p for p in JOBS.iterdir() if p.is_dir() and not p.name.startswith("_") and name.lower() in p.name)
     if len(hits) == 1:
         return hits[0]
     if not hits:
@@ -87,6 +89,11 @@ def main(argv: list[str] | None = None) -> int:
             print(__doc__)
         elif args[:1] == ["ls"]:
             ls()
+        elif args[:1] == ["scan"] and len(args) == 2:
+            print(f"Готово: {scan.scan(args[1], fx.get_rates(), index_path=INDEX)}")
+        elif args[:1] == ["take"] and len(args) == 2:
+            d = scan.take(args[1], jobs=JOBS)
+            show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))
         elif args[:1] == ["show"] and len(args) == 2:
             show(find(args[1]))
         elif not args:
@@ -104,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(__doc__)
             return 2
-    except (ConfigError, ValueError, FileNotFoundError) as e:
+    except (ConfigError, ValueError, FileNotFoundError, OSError) as e:
         print(f"Ошибка: {e}", file=sys.stderr)
         return 1
     return 0

@@ -46,3 +46,14 @@ def test_guess_source():
     assert quick.guess_source("Об этой вакансии\n...") == "linkedin"
     assert quick.guess_source("Subject: RTR\nHi") == "email"
     assert quick.guess_source("Hi, 1000 PLN/day") == "text"
+
+
+def test_take_from_pool(jr, capsys, tmp_path, monkeypatch):
+    src = tmp_path / "jobs" / "_pool" / "2026-11-05" / "northwind-labs-senior-ai-engineer" / "raw"
+    src.mkdir(parents=True)
+    shutil.copy(FIX / "08-synthetic-low-job" / "raw" / "001-linkedin.txt", src / "001-justjoin.txt")
+    monkeypatch.setattr(quick.scan, "POOL", tmp_path / "jobs" / "_pool")
+    assert jr("take", "northwind-labs-senior-ai-engineer") == 0
+    assert "northwind-labs-senior-ai-engineer" in (tmp_path / "index.csv").read_text()
+    assert jr("show", "northwind") == 0                     # _pool не мешает поиску по началу слага
+    assert jr("take", "northwind-labs-senior-ai-engineer") == 1   # второй раз — уже в jobs/
