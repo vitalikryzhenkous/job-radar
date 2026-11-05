@@ -4,7 +4,7 @@ const API = "http://127.0.0.1:8766";
 const MAX = 100;                                   // = scan.MAX_COLLECT
 const DEC_RU = { apply: "подаваться", clarify: "уточнить", skip: "пропустить", duplicate: "дубль", stop_scam: "скам" };
 const $ = s => document.querySelector(s);
-const say = (text, cls = "muted") => { $("#msg").className = cls; $("#msg").textContent = text; };
+const say = (text, cls = "") => { $("#msg").className = cls; $("#msg").textContent = text; };
 const button = (text, fn, cls = "") => {
   const b = document.createElement("button"); b.textContent = text; b.className = cls; b.onclick = fn;
   $("#actions").append(b); return b;
@@ -54,12 +54,13 @@ async function main() {
   const send = urls.slice(0, MAX);
   say(`Найдено вакансий: ${urls.length}${urls.length > MAX ? ` (за раз беру первые ${MAX})` : ""}.`
       + " Списки подгружаются при прокрутке: прокрути до конца, чтобы взять больше, и открой окно снова.");
-  button(`Оценить ${send.length}`, async e => {
+  const go = button(`Оценить ${send.length}`, async e => {
     e.target.disabled = true;
     try { await getJSON("/api/collect", { method: "POST", headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ urls: send }) }); poll(); }
     catch (err) { say("Сервер отказал: " + err.message, "err"); e.target.disabled = false; }
-  });
+  }, "main");
+  go.focus();
 }
 
 async function poll() {
@@ -75,10 +76,18 @@ async function poll() {
     return setTimeout(poll, 1500);
   }
   if (st.error) return say("Ошибка: " + st.error, "err");
-  const sum = Object.entries(st.summary || {}).map(([k, v]) => `${DEC_RU[k] || k}: ${v}`).join(" · ");
-  say(`Готово, пул ${st.pool}. ${sum}`, "ok");
-  button("Открыть карту", () => chrome.tabs.create({ url: API + "/" }));
-  button("Ещё раз", () => location.reload(), "sec");
+  say(`Готово. Пул ${st.pool}:`);
+  const order = ["apply", "clarify", "skip"];                         // сначала то, что важно, затем остальное
+  const rows = Object.entries(st.summary || {}).sort(([a], [b]) => (order.indexOf(a) + 9) % 9 - (order.indexOf(b) + 9) % 9);
+  $("#stats").replaceChildren(...rows.map(([k, v]) => {
+    const li = document.createElement("li"); li.className = order.includes(k) ? k : "other";
+    li.innerHTML = '<span class="lbl"></span><span class="dots"></span><b></b>';
+    li.querySelector(".lbl").textContent = DEC_RU[k] || k; li.querySelector("b").textContent = v;
+    return li;
+  }));
+  $("#stats").hidden = !rows.length;
+  button("Ещё раз", () => location.reload());
+  button("Открыть карту", () => chrome.tabs.create({ url: API + "/" }), "main").focus();
 }
 
 main().catch(e => say("Ошибка: " + e.message, "err"));

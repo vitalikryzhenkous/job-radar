@@ -51,13 +51,24 @@ LVL_WORD = {"Polish": {"native": "C2", "fluent": "C1", "advanced": "C1", "profic
             "English": {"native": "C2", "proficient": "C2"}}
 
 
-def lang_level(text: str, req_text: str, lang: str = "Polish") -> str | None:
-    """Самый высокий требуемый уровень языка (CEFR) или None."""
+# польские формы: «angielski C1», «języka angielskiego na poziomie min. B2», «polskiego (C1)»
+LANG_RX = {"English": r"(?:english|angielsk(?:i|iego|im))", "Polish": r"(?:polish|polsk(?:i|iego|im))"}
+_RANGE = re.compile(r"\b([ABC][12])\+?\s*(?:/|-|–|lub|or)\s*[ABC][12]\b")       # «B2/C1», «B2+/C1» -> минимум B2
+
+
+def lang_level(text: str, req_text: str, lang: str = "Polish", nice_text: str = "") -> str | None:
+    """Самый высокий требуемый уровень языка (CEFR) или None. Ищем по всему тексту, кроме «nice to have»:
+    польские заголовки (Wymagania…) не всегда разбираются в секции, а язык пишут где угодно."""
+    name = LANG_RX[lang]
     line = re.compile(rf"^Languages:[^\n]*\b{lang} ([ABC][12])\b", re.M)
-    near = re.compile(rf"\b{_LVL}\b[^.\n]{{0,30}}\b{lang}\b|\b{lang}\b[^.\n,;]{{0,25}}\b{_LVL}\b", I)
+    # уровень перед языком — только вплотную и без «and/i»: «Polish C1 and English B2» не даёт English C1
+    near = (re.compile(rf"\b{_LVL}\b(?:(?!\b(?:and|i|oraz|or)\b)[^.\n,;]){{0,12}}\b{name}\b", I),
+            re.compile(rf"\b{name}\b[^.\n;]{{0,45}}?\b{_LVL}\b", I))     # отдельно: «Fluent English (C1)» — оба
     found = [m[1] for m in line.finditer(text)]
-    for m in near.finditer(req_text):
-        w = m[1] or m[2]
+    nice = {x.strip() for x in nice_text.splitlines() if x.strip()}
+    body = "\n".join(x for x in (req_text + "\n" + text).splitlines() if x.strip() not in nice)
+    for m in (m for rx in near for m in rx.finditer(_RANGE.sub(r"\1", re.sub(r"\b(min|np|ok)\.", r"\1", body, flags=I)))):
+        w = m[1]
         found.append(w.upper() if w.upper() in CEFR else LVL_WORD[lang].get(w.lower()))
     found = [x for x in found if x]
     return max(found, key=CEFR.index) if found else None
@@ -327,8 +338,8 @@ def extract(n: Normalized, fx: dict, on: dt.date | None = None) -> dict:
         "rate": rate,
         "stack": {"must": tech_groups(req), "nice": tech_groups(nice)},
         "years": years,
-        "languages": {"polish_high": polish, "polish_level": polish_level(text, req_text),
-                      "english_level": lang_level(text, req_text, "English"),
+        "languages": {"polish_high": polish, "polish_level": lang_level(text, req_text, "Polish", "\n".join(nice)),
+                      "english_level": lang_level(text, req_text, "English", "\n".join(nice)),
                       "english_high": bool(ENGLISH_HI.search(req_text))},
         "degree": {"required": bool(degree) and not DEGREE_SOFT.search(degree.string[degree.start():degree.end() + 60]),
                    "cs": bool(degree), "phd": bool(PHD.search(req_text)),
