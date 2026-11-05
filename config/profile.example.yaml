@@ -2,21 +2,25 @@
 # cp config/profile.example.yaml config/profile.yaml
 
 verified: false            # владелец ставит true после проверки
+first_name: "<имя>"        # чужое имя в обращении -> риск wrong_name
+min_rate: {amount: 0, currency: PLN, unit: day}   # floor в ответах на низкую ставку
 location: {city: "<город>", country: "PL"}
 contract: {preferred: [B2B], entity: "JDG"}
 available_from: YYYY-MM-DD
 work_mode: [remote, "hybrid:<город>"]
 level: senior
+experience: {total_years: 0, ai_years: 0}
 
 target_roles:
   primary: [fde_applied_ai]
   fallback: [fullstack]
 
-skills:                    # level: strong | core | basic | production
+skills:                    # level: strong | core | production | basic | pet
   - {name: "<навык>", level: strong, years: 0}
 
 languages: {English: B2}
-degree: {level: master, field: "<область>", retraining: true}
+gaps: []                   # технологий нет совсем
+degree: {level: master, field: "<область>", cs: false}
 
 stories_path: ~/path/to/stories.md   # только status: confirmed
 

@@ -21,3 +21,4 @@ role_map:
   fullstack_ai: applied_ai_senior
   fullstack: fullstack_senior
   other: fullstack_senior
+  admin: fullstack_senior
