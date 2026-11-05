@@ -11,7 +11,7 @@ fit:                      # соответствие, сумма 100
   must: 20
   lang_degree: 10
 
-job:                      # вакансия, сумма 100
+job:                      # вакансия, сумма 100; в балл идут только известные части
   money: 30               # против market.yaml
   contract: 20            # B2B, удалёнка или Познань гибрид
   company: 20             # компания и отзывы
@@ -49,9 +49,11 @@ decision:
   skip_below: 50                 # оба < 50 -> skip
   research_min: 50               # исследование, если оба >= 50 и есть missing
   key_fields: [rate, contract, client, role, location]   # outreach без любого -> clarify
-  # Публичная вакансия (posting) без ставки: fit >= apply.fit и покрытие job < 50% -> apply,
-  # недостающее уходит в call_notes. Иначе Forte/Inviso никогда не дойдут до apply.
-  posting_low_coverage: 0.5
+  # job = сумма известных частей / их максимум × 100; coverage = доля известных весов.
+  # coverage < min_coverage -> job н/д, решение по fit (блокеры проверяются раньше):
+  # fit >= apply.fit -> apply + call_notes (ставка, B2B, клиент); fit < skip_below -> skip; иначе clarify.
+  # Outreach без ключевых полей -> clarify до этой проверки.
+  min_coverage: 0.5
 
 # Дорога вычитается из ставки перед сравнением с рынком (money), не штраф.
 travel:

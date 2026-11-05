@@ -60,6 +60,8 @@ def test_case(tmp_path, slug, upto, index, exp):
         "screen_questions": lambda v: ex["screen_questions"] == v,
         "template": lambda v: sc["template"] == v,
         "reason": lambda v: sc["reason"] == v,
+        "job": lambda v: sc["job"] == v,
+        "coverage_below": lambda v: sc["coverage"] < v,
     }
     for key, v in exp.items():
         if key == "decision":

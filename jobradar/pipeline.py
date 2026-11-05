@@ -10,6 +10,7 @@ from . import tracker
 from .config import CONFIG, load_profile, load_yaml
 from .extract import extract
 from .normalize import normalize, to_markdown
+from .score import job_label
 
 
 def _dump(path: Path, data) -> None:
@@ -50,7 +51,7 @@ def run(job_dir: Path, fx: dict, *, index_path: Path = tracker.INDEX, profile: d
         tracker.upsert({
             "slug": slug, "company": ex["company"] or "", "role": ex["role"] or "", "job_id": ex["job_id"] or "",
             "status": (old or {}).get("status") or ("skipped" if sc["decision"] in ("skip", "stop_scam") else "new"),
-            "fit": sc["fit"], "job": sc["job"], "decision": sc["decision"],
+            "fit": sc["fit"], "job": "" if sc["job"] is None else sc["job"], "decision": sc["decision"],
         }, index_path)
     return {"extract": ex, "flags": f, "score": sc}
 
@@ -69,7 +70,7 @@ def summary(res: dict) -> str:
     ex, f, sc = res["extract"], res["flags"], res["score"]
     lines = [
         f"{ex['company'] or '?'} — {ex['role'] or '?'} [{ex['role_class']}, {ex['source_kind']}]",
-        f"fit {sc['fit']}  job {sc['job']}  покрытие {sc['coverage']:.0%}  -> {sc['decision']} ({sc['reason']})",
+        f"fit {sc['fit']}  job {job_label(sc)}  -> {sc['decision']} ({sc['reason']})",
     ]
     if f["scam"]:
         lines.append("СКАМ: " + ", ".join(r["code"] for r in f["scam"]))

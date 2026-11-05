@@ -94,9 +94,11 @@ def travel_pln_h(ex: dict, profile: dict, weights: dict) -> float:
     return t["other_city_trip_pln"] * days * t["weeks_per_month"] / HOURS_PER_MONTH
 
 
-def job_score(ex: dict, profile: dict, weights: dict, market: dict) -> tuple[float, dict, float, dict]:
+def job_score(ex: dict, profile: dict, weights: dict, market: dict) -> tuple[float | None, dict, float, dict]:
+    """Балл по известным частям: сумма известных / их максимум × 100. Неизвестные не считаются нулём.
+    parts: {часть: [балл, максимум]} только для известных; coverage = доля известных весов."""
     W = weights["job"]
-    parts, known = {}, {}
+    parts: dict[str, list[float]] = {}
     mk = market_row(ex, market)
     rate = ex["rate"]
     money = {"market": mk, "effective_pln_h": None, "travel_pln_h": round(travel_pln_h(ex, profile, weights), 2)}
@@ -110,57 +112,44 @@ def job_score(ex: dict, profile: dict, weights: dict, market: dict) -> tuple[flo
             m = W["money"] / 2 + W["money"] / 2 * (eff - lo) / (hi - lo)
         else:
             m = W["money"] / 2 * max(0.0, 1 - (lo - eff) / (0.3 * lo))
-        parts["money"], known["money"] = m, W["money"]
-    else:
-        parts["money"] = W["money"] / 2
+        parts["money"] = [m, W["money"]]
 
     half = W["contract"] / 2
     loc = ex["location"]
     city = profile["location"]["city"].lower()
     other = [c for c in loc["cities"] if c.lower() != city]
-    if loc["remote"] == "full" or (loc["remote"] == "hybrid" and not other and loc["cities"]):
-        fmt = half
-    elif loc["remote"] == "hybrid" and other:
-        fmt = {1: half / 2, 2: half / 5}.get(loc["onsite_days_per_week"], 0)
-    else:
-        fmt = half / 2
     if loc["remote"]:
-        known["format"] = half
-    c = ex["contract"]
-    preferred = profile.get("contract", {}).get("preferred", ["B2B"])
-    if c:
-        con = half if any(x in preferred for x in c) else half / 2
-        known["contract"] = half
-    else:
-        con = half / 2
-    parts["contract"] = fmt + con
+        if loc["remote"] == "full" or (loc["remote"] == "hybrid" and not other and loc["cities"]):
+            fmt = half
+        elif loc["remote"] == "hybrid" and other:
+            fmt = {1: half / 2, 2: half / 5}.get(loc["onsite_days_per_week"], 0)
+        else:
+            fmt = half / 2
+        parts["format"] = [fmt, half]
+    if ex["contract"]:
+        preferred = profile.get("contract", {}).get("preferred", ["B2B"])
+        parts["contract"] = [half if any(x in preferred for x in ex["contract"]) else half / 2, half]
 
-    parts["company"] = W["company"] / 2           # до исследования неизвестно
+    # company: до исследования неизвестна -> не входит в балл
 
     st = ex["interview_stages"]
     if st:
-        parts["process"] = W["process"] if st <= 3 else W["process"] * 0.7 if st == 4 else W["process"] * 0.3
-        known["process"] = W["process"]
-    else:
-        parts["process"] = W["process"] / 2
+        parts["process"] = [W["process"] if st <= 3 else W["process"] * 0.7 if st == 4 else W["process"] * 0.3,
+                            W["process"]]
 
     p = ex["poster"]["type"]
-    parts["direct"] = W["direct"] if p == "employer" else W["direct"] / 2 if ex["client_named"] else 0
     if p != "unknown":
-        known["direct"] = W["direct"]
-    else:
-        parts["direct"] = W["direct"] / 2
+        parts["direct"] = [W["direct"] if p == "employer" else W["direct"] / 2 if ex["client_named"] else 0,
+                           W["direct"]]
 
-    h = ex["hours"]
-    if h:
-        parts["hours"] = W["hours"] if h["end"] <= "18:00" else W["hours"] / 2
-        known["hours"] = W["hours"]
-    else:
-        parts["hours"] = W["hours"] / 2
+    if h := ex["hours"]:
+        parts["hours"] = [W["hours"] if h["end"] <= "18:00" else W["hours"] / 2, W["hours"]]
 
-    parts = {k: round(v, 1) for k, v in parts.items()}
-    coverage = round(sum(known.values()) / sum(W.values()), 2)
-    return sum(parts.values()), parts, coverage, money
+    parts = {k: [round(s, 1), mx] for k, (s, mx) in parts.items()}
+    known_max = sum(mx for _, mx in parts.values())
+    coverage = round(known_max / sum(W.values()), 2)
+    job = sum(s for s, _ in parts.values()) / known_max * 100 if known_max else None
+    return job, parts, coverage, money
 
 
 # ---------- деньги для ответа
@@ -208,21 +197,27 @@ def is_empty(ex: dict) -> bool:
     return not (ex["stack"]["must"] or ex["rate"] or ex["contract"] or loc["remote"] or loc["cities"])
 
 
-def decide(ex: dict, flags: dict, fit: float, job: float, coverage: float, dups: list, weights: dict) -> tuple[str, str]:
+def decide(ex: dict, flags: dict, fit: float, job: float | None, coverage: float, dups: list,
+           weights: dict) -> tuple[str, str]:
     D = weights["decision"]
     if flags["scam"]:
         return "stop_scam", flags["scam"][0]["code"]
     if flags["blockers"]:
-        return "skip", flags["blockers"][0]["evidence"] if flags["blockers"][0]["code"] == "admin_role" \
-            else flags["blockers"][0]["code"]
+        b = flags["blockers"][0]
+        return "skip", b["evidence"] if b["code"] == "admin_role" else b["code"]
     if dups:
         return "duplicate", f"{dups[0]['by']}: {dups[0]['slug']}"
     if ex["source_kind"] == "outreach" and ex["missing"]:
         return "clarify", "missing: " + ", ".join(ex["missing"])
+    if job is None or coverage < D["min_coverage"]:
+        # данных о вакансии мало: решаем по fit, остальное на звонке
+        if fit >= D["apply"]["fit"]:
+            return "apply", f"fit {fit:.0f}, job н/д (coverage {coverage:.0%}), остальное на звонке"
+        if fit < D["skip_below"]:
+            return "skip", f"fit {fit:.0f} < {D['skip_below']}, job н/д"
+        return "clarify", f"fit {fit:.0f}, job н/д (coverage {coverage:.0%})"
     if fit >= D["apply"]["fit"] and job >= D["apply"]["job"]:
         return "apply", "оба порога пройдены"
-    if ex["source_kind"] == "posting" and fit >= D["apply"]["fit"] and coverage < D["posting_low_coverage"]:
-        return "apply", f"posting: fit {fit:.0f}, покрытие job {coverage:.0%}, остальное на звонке"
     if fit < D["skip_below"] and job < D["skip_below"]:
         return "skip", "оба балла < порога"
     return "clarify", "пограничные баллы"
@@ -247,7 +242,7 @@ def template(decision: str, ex: dict, flags: dict, adv: dict) -> str | None:
 def call_notes(ex: dict, profile: dict) -> list[str]:
     notes = []
     pref = profile.get("contract", {}).get("preferred", ["B2B"])
-    if ex["contract"] and not any(c in pref for c in ex["contract"]):
+    if not ex["contract"] or not any(c in pref for c in ex["contract"]):
         notes.append(f"уточнить {pref[0]} на звонке")
     if not ex["rate"]:
         notes.append("спросить вилку ставки")
@@ -256,19 +251,27 @@ def call_notes(ex: dict, profile: dict) -> list[str]:
     return notes
 
 
+def job_label(sc: dict) -> str:
+    return f"{sc['job']} (coverage {sc['coverage']:.0%})" if sc["job"] is not None \
+        else f"н/д (coverage {sc['coverage']:.0%})"
+
+
 def score(ex: dict, flags: dict, dups: list, profile: dict, weights: dict, market: dict, fx: dict) -> dict:
+    D = weights["decision"]
     fit, fit_parts = fit_score(ex, profile, weights)
     job, job_parts, coverage, money = job_score(ex, profile, weights, market)
     pen = _penalties(flags, weights, ex, money)
     fit = max(0, min(100, round(fit + pen["fit"])))
-    job = max(0, min(100, round(job + pen["job"])))
+    if job is not None and coverage >= D["min_coverage"]:
+        job = max(0, min(100, round(job + pen["job"])))
+    else:
+        job = None                                # н/д: мало известных частей
     if flags["blockers"]:
-        fit = job = 0
+        fit, job = 0, (0 if job is not None else None)
     decision, reason = decide(ex, flags, fit, job, coverage, dups, weights)
     adv = money_advice(ex, profile, fx, money)
-    D = weights["decision"]
-    research = decision in ("apply", "clarify") and fit >= D["research_min"] and job >= D["research_min"] \
-        and bool(ex["missing"])
+    research = decision in ("apply", "clarify") and fit >= D["research_min"] \
+        and (job is None or job >= D["research_min"]) and bool(ex["missing"])
     return {
         "fit": fit, "job": job, "coverage": coverage,
         "fit_parts": fit_parts, "job_parts": job_parts, "penalties": pen,

@@ -14,6 +14,8 @@
   decision: apply
   contract: [UoP]                      # direct-hire permanent employee
   call_notes: ["уточнить B2B на звонке"]
+  job: null                            # н/д: известно < 50% весов job
+  coverage_below: 0.5
 
 04-avance-ai-fullstack:
   after_001:
