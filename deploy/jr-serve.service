@@ -1,0 +1,23 @@
+# jr-serve: карта Job Radar + приёмник расширения Chrome, systemd USER unit на M920q. Только 127.0.0.1:8766.
+# Установка (один раз):  systemctl --user link ~/apps/job-radar/deploy/jr-serve.service
+#                        systemctl --user enable --now jr-serve
+# После git pull, меняющего этот файл: systemctl --user daemon-reload && systemctl --user restart jr-serve
+# Откат: systemctl --user disable --now jr-serve   (disable снимает и ссылку из ~/.config/systemd/user)
+[Unit]
+Description=Job Radar map + extension collector (jr serve, 127.0.0.1:8766)
+After=network.target
+
+[Service]
+Type=exec
+WorkingDirectory=%h/apps/job-radar
+# bind 127.0.0.1 зашит в serve.py; --no-open: у службы нет окна, браузер не открываем
+ExecStart=%h/apps/job-radar/bin/jr serve 8766 --no-open
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
