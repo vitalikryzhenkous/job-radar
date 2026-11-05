@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# jr — короткий вход в Job Radar (справка: jr help). Работает из любой папки.
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+exec "$ROOT/.venv/bin/python" -m jobradar.quick "$@"
