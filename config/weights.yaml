@@ -46,6 +46,7 @@ blockers:
   - phd_required
   - onsite_other_city_3d
   - admin_role                   # админ/эксплуатация вместо разработки
+  - non_dev_role                 # аналитик, консультант, product owner, PM — не разработка
 
 decision:
   apply: {fit: 70, job: 60}      # оба порога -> apply

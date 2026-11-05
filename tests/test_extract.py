@@ -66,3 +66,19 @@ def test_empty_and_us_and_onsite():
     assert e7["location"]["onsite_days_per_week"] == 1 and e7["location"]["cities"] == ["Warsaw"]
     assert e7["role_class"] == "fde_applied_ai"
     assert ex("07-ai-engineer-warsaw-admin")["role_class"] == "admin"
+
+
+def test_role_class_non_dev():
+    from jobradar.extract import role_class
+    assert role_class("Senior IT Business Analyst with AI - Freelance", "") == "non_dev"
+    assert role_class("AI Product Owner", "") == "non_dev"
+    assert role_class("Senior AI Governance Consultant", "") == "non_dev"
+    assert role_class("AI Governance Engineer", "") == "other"          # инженер — не отсекаем
+    assert role_class("Senior AI Engineer", "") == "fde_applied_ai"
+
+
+def test_company_with_country_in_name(tmp_path):
+    p = tmp_path / "001-justjoin.txt"
+    p.write_text("ACME Polska\nAI Engineer\nWarszawa, Poland · Remote\nSalary: 100 - 180 PLN/hour (B2B)\nWe build agents.\n")
+    e = extract(normalize([p]), FX, ON)
+    assert (e["company"], e["role"]) == ("ACME Polska", "AI Engineer")
