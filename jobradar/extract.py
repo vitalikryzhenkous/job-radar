@@ -42,20 +42,29 @@ YEARS = re.compile(r"(\d+)\s*(?:\+|–\s*\d+|-\s*\d+)?\s*(?:\+\s*)?(?:years?|yrs
 GENERAL_CTX = re.compile(r"^\W*(?:of\s+)?(?:experience\s+)?(?:in|of|with)?\s*(software|engineering|development|experience|professional|full-stack|commercial)", I)
 AI_CTX = re.compile(r"\b(ai|artificial intelligence|llm|ml|machine learning|genai)\b", I)
 POLISH_HI = re.compile(r"(advanced|fluent|c1|c2|native|proficient)[^.]{0,30}\bpolish\b|\bpolish\b[^.]{0,20}(advanced|fluent|c1|c2|native)", I)
-# уровень польского: CEFR или слово; «Languages:» — строка из jr scan (поле languages страницы justjoin)
-_PL_LVL = r"(A1|A2|B1|B2|C1|C2|native|fluent|advanced|proficient|intermediate|communicative|basic)"
-POLISH_LVL = re.compile(rf"\b{_PL_LVL}\b[^.\n]{{0,30}}\bpolish\b|\bpolish\b[^.\n,;]{{0,25}}\b{_PL_LVL}\b", I)
-LANG_LINE = re.compile(r"^Languages:[^\n]*\bPolish ([ABC][12])\b", re.M)
+# требуемый уровень языка: CEFR или слово; «Languages:» — строка из jr scan (поле languages страницы justjoin)
+_LVL = r"(A1|A2|B1|B2|C1|C2|native|fluent|advanced|proficient|intermediate|communicative|basic)"
 CEFR = ("A1", "A2", "B1", "B2", "C1", "C2")
-PL_WORD = {"native": "C2", "fluent": "C1", "advanced": "C1", "proficient": "C1", "intermediate": "B1",
-           "communicative": "B1", "basic": "A2"}
+LVL_WORD = {"Polish": {"native": "C2", "fluent": "C1", "advanced": "C1", "proficient": "C1", "intermediate": "B1",
+                       "communicative": "B1", "basic": "A2"},
+            # в польских вакансиях «fluent/advanced English» обычно = B2, отсеиваем только явный C1+ / native
+            "English": {"native": "C2", "proficient": "C2"}}
+
+
+def lang_level(text: str, req_text: str, lang: str = "Polish") -> str | None:
+    """Самый высокий требуемый уровень языка (CEFR) или None."""
+    line = re.compile(rf"^Languages:[^\n]*\b{lang} ([ABC][12])\b", re.M)
+    near = re.compile(rf"\b{_LVL}\b[^.\n]{{0,30}}\b{lang}\b|\b{lang}\b[^.\n,;]{{0,25}}\b{_LVL}\b", I)
+    found = [m[1] for m in line.finditer(text)]
+    for m in near.finditer(req_text):
+        w = m[1] or m[2]
+        found.append(w.upper() if w.upper() in CEFR else LVL_WORD[lang].get(w.lower()))
+    found = [x for x in found if x]
+    return max(found, key=CEFR.index) if found else None
 
 
 def polish_level(text: str, req_text: str) -> str | None:
-    """Самый высокий требуемый уровень польского (CEFR) или None."""
-    found = [m[1] for m in LANG_LINE.finditer(text)]
-    found += [PL_WORD.get((m[1] or m[2]).lower(), (m[1] or m[2]).upper()) for m in POLISH_LVL.finditer(req_text)]
-    return max(found, key=CEFR.index) if found else None
+    return lang_level(text, req_text, "Polish")
 
 
 ENGLISH_HI = re.compile(r"(c1|c2|native|fluent)[^.]{0,20}\benglish\b|\benglish\b[^.]{0,20}(c1|c2|native)", I)
@@ -319,6 +328,7 @@ def extract(n: Normalized, fx: dict, on: dt.date | None = None) -> dict:
         "stack": {"must": tech_groups(req), "nice": tech_groups(nice)},
         "years": years,
         "languages": {"polish_high": polish, "polish_level": polish_level(text, req_text),
+                      "english_level": lang_level(text, req_text, "English"),
                       "english_high": bool(ENGLISH_HI.search(req_text))},
         "degree": {"required": bool(degree) and not DEGREE_SOFT.search(degree.string[degree.start():degree.end() + 60]),
                    "cs": bool(degree), "phd": bool(PHD.search(req_text)),

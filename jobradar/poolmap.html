@@ -31,6 +31,8 @@ h1 { font-size: 18px; margin: 0; }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .controls { padding: 0 16px 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .chip[aria-pressed="false"] { opacity: .45; }
+progress { width: 140px; height: 8px; vertical-align: middle; accent-color: var(--accent); }
+#scan-log { margin-left: 8px; font-size: 12px; }
 .chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 input[type=search] { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
   padding: 5px 8px; font: inherit; min-width: 160px; }
@@ -110,7 +112,7 @@ const TARGET_H = 1500 / 8;   // цель 1500 PLN/день
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const state = { tab: "fit", dec: new Set(["apply", "clarify"]), q: "", rateOk: false, city: null, sel: null,
-                mode: new Set(store.get("jr-mode", ["full", "hybrid", "none"])), gone: false, sort: store.get("jr-sort", "dec"),
+                mode: new Set(store.get("jr-mode", ["full", "hybrid", "none"])), gone: false, oldNo: false, sort: store.get("jr-sort", "dec"),
                 stars: new Set(store.get("jr-stars-" + DATA.date, [])) };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -133,7 +135,7 @@ const fail = e => alert("Не получилось: " + e.message);
 
 function base(r) {           // все фильтры, кроме города
   const q = state.q.toLowerCase();
-  return state.dec.has(r.decision) && state.mode.has(mode(r)) && (state.gone || !r.gone)
+  return state.dec.has(r.decision) && state.mode.has(mode(r)) && (state.gone || !r.gone) && (state.oldNo || !r.prev?.old_no)
     && (!q || (r.company + " " + r.role + " " + r.why).toLowerCase().includes(q))
     && (!state.rateOk || (r.rate && r.rate[1] >= TARGET_H));
 }
@@ -155,6 +157,7 @@ function controls() {
     + ["full", "hybrid", "onsite", "none"].filter(m => DATA.rows.some(r => mode(r) === m)).map(m =>
       `<button class="chip" data-mode="${m}" aria-pressed="${state.mode.has(m)}">${MODE_RU[m]} ${DATA.rows.filter(r => mode(r) === m).length}</button>`).join("")
     + (DATA.rows.some(r => r.gone) ? `<button class="chip" id="gone" aria-pressed="${state.gone}" title="были в пуле, но нет в последнем скане">пропавшие ${DATA.rows.filter(r => r.gone).length}</button>` : "")
+    + (DATA.rows.some(r => r.prev?.old_no) ? `<button class="chip" id="oldno" aria-pressed="${state.oldNo}" title="уже видели раньше: skip или отказ">старые отказы ${DATA.rows.filter(r => r.prev?.old_no).length}</button>` : "")
     + `<button class="chip" id="rate" aria-pressed="${state.rateOk}">верх ставки ≥ 1500/день</button>`
     + `<select id="sort" title="сортировка списка">${Object.entries({ dec: "по решению", fit: "по fit", job: "по job", rate: "по ставке", km: "по расстоянию", status: "сначала с откликом" })
       .map(([k, v]) => `<option value="${k}" ${state.sort === k ? "selected" : ""}>${v}</option>`).join("")}</select>`
@@ -166,6 +169,7 @@ function controls() {
   document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
     state.mode.has(b.dataset.mode) ? state.mode.delete(b.dataset.mode) : state.mode.add(b.dataset.mode);
     store.set("jr-mode", [...state.mode]); draw(); });
+  if ($("#oldno")) $("#oldno").onclick = () => { state.oldNo = !state.oldNo; draw(); };
   if ($("#gone")) $("#gone").onclick = () => { state.gone = !state.gone; draw(); };
   $("#sort").onchange = e => { state.sort = e.target.value; store.set("jr-sort", state.sort); drawBody(); };
   $("#q").oninput = e => { state.q = e.target.value; drawBody(); };
@@ -241,6 +245,7 @@ function list(rows) {
 
 function tags(r) {
   return (r.new ? `<span class="tag new">новая</span>` : "") + (r.gone ? `<span class="tag">пропала</span>` : "")
+    + (r.prev ? `<span class="tag" title="первый раз: ${esc(r.prev.first)}">было ${esc(r.prev.first.slice(5))}: ${esc(r.prev.status ? ST_RU[r.prev.status] : DEC_RU[r.prev.decision] || r.prev.decision)}</span>` : "")
     + (r.remote !== "full" && r.remote ? `<span class="tag">${MODE_RU[mode(r)]}${r.city && r.city !== DATA.home ? " " + esc(r.city) : ""}</span>` : "")
     + (r.taken ? `<span class="tag">в jobs: ${esc(r.taken)}</span>` : "") + (r.status ? `<span class="tag st">${ST_RU[r.status.status]}</span>` : "");
 }
@@ -263,6 +268,7 @@ function detail() {
     <div style="margin-top:6px">🧩 ${esc(r.why)}</div>
     ${r.risks.length ? `<div style="margin-top:6px">⚠️ ${r.risks.map(esc).join(", ")}</div>` : ""}
     ${r.remote && r.remote !== "full" && r.city !== DATA.home ? `<div style="margin-top:6px">🏢 ${MODE_RU[mode(r)]} не в ${esc(DATA.home)} — в профиле hybrid только ${esc(DATA.home)}</div>` : ""}
+    ${r.prev ? `<div style="margin-top:6px" class="muted">Уже видели ${esc(r.prev.first)}: ${esc(DEC_RU[r.prev.decision] || r.prev.decision)}${r.prev.status ? ", отклик: " + esc(ST_RU[r.prev.status]) : ""}.</div>` : ""}
     ${r.gone ? `<div style="margin-top:6px" class="muted">Нет в последнем скане сайта — вакансию могли закрыть.</div>` : ""}
     <div class="actions"><span class="muted">Отклик:</span>
       ${API ? `<select id="st-sel"><option value="">— не подавался</option>${DATA.statuses.map(s => `<option value="${s}" ${r.status?.status === s ? "selected" : ""}>${ST_RU[s]}</option>`).join("")}</select>`
@@ -357,7 +363,10 @@ function tools() {
 }
 async function poll() {
   const j = await (await fetch("/api/job")).json();
-  $("#scan-log").textContent = j.error ? "ошибка: " + j.error : (j.log.at(-1) || "старт…");
+  const m = [...j.log].reverse().map(l => /^\[(\d+)\/(\d+)\]/.exec(l)).find(Boolean);   // «[12/50] apply …»
+  $("#scan-log").innerHTML = j.error ? "ошибка: " + esc(j.error)
+    : m ? `<progress max="${m[2]}" value="${m[1]}"></progress> ${m[1]}/${m[2]} · ~${Math.ceil((m[2] - m[1]) * 2 / 60)} мин`
+    : j.running ? `<progress></progress> читаю список…` : esc(j.log.at(-1) || "");
   if (j.running) return setTimeout(poll, 1500);
   $("#scan").disabled = false;
   if (j.pool) location.href = "/?pool=" + encodeURIComponent(j.pool);

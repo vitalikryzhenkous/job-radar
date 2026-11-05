@@ -92,3 +92,10 @@ def test_polish_level():
     assert polish_level("", "Polish B2 or higher") == "B2"
     assert polish_level("", "Polish at A2 level, English C1") == "A2"
     assert polish_level("", "Experience with Polish market") is None
+
+
+def test_english_level():
+    from jobradar.extract import lang_level
+    assert lang_level("Languages: English C1, Polish C1\n", "", "English") == "C1"
+    assert lang_level("", "Fluent English", "English") is None          # fluent не блокируем
+    assert lang_level("", "English at C1 level", "English") == "C1"

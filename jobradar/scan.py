@@ -35,13 +35,34 @@ def fetch(url: str) -> str:
         return r.read().decode("utf-8", "replace")
 
 
+# площадки, с которых качаем страницы вакансий: (имя для raw-файла, путь страницы вакансии).
+# robots.txt проверен для каждой; LinkedIn здесь не будет никогда (только вставка: jr add).
+SITES = {
+    "justjoin.it": ("justjoin", r"/job-offer/[\w-]+"),
+    "nofluffjobs.com": ("nofluff", r"/(?:pl/)?job/[\w-]+"),         # robots: закрыты /api/, /posting/, */job/job/*
+}
+MAX_COLLECT = 100
+
+
+def site_of(url: str) -> str:
+    """Имя площадки для ссылки на вакансию или ValueError (чужой сайт, не https, не страница вакансии)."""
+    u = urlparse(url)
+    site = SITES.get(u.hostname or "")
+    if u.scheme != "https" or not site or u.port or not re.fullmatch(site[1], u.path.rstrip("/")):
+        raise ValueError(f"не страница вакансии поддерживаемой площадки: {url[:120]}")
+    return site[0]
+
+
 def _ld(page: str) -> list[dict]:
     out = []
     for m in LD.finditer(page):
         try:
-            out.append(json.loads(m[1]))
+            d = json.loads(m[1])
         except json.JSONDecodeError:
             continue
+        for x in d if isinstance(d, list) else d.get("@graph", [d]):      # nofluff: список; бывает @graph
+            if isinstance(x, dict):
+                out.append(x)
     return out
 
 
@@ -91,14 +112,17 @@ def posting_text(jp: dict, url: str, langs: list[tuple[str, str]] | None = None)
              f"Source: {url}"]                       # не в конце: длинная последняя строка = признак обрезки
     sal = jp.get("baseSalary") or {}
     v = sal.get("value") or {}
-    if v.get("minValue"):
+    lo = v.get("minValue") or v.get("value")                     # nofluff: одно число в value
+    if lo:
         unit = UNIT.get((v.get("unitText") or "").upper(), "month")
-        lines.append(f"Salary: {v['minValue']:.0f} - {v.get('maxValue') or v['minValue']:.0f} "
+        lines.append(f"Salary: {lo:.0f} - {v.get('maxValue') or lo:.0f} "
                      f"{sal.get('currency', 'PLN')}/{unit}" + (f" ({', '.join(contract)})" if contract else ""))
     elif contract:
         lines.append("Contract: " + ", ".join(contract))
     lines.append("Languages: " + (", ".join(f"{n} {lvl}" for n, lvl in langs) if langs else "-"))   # «-» = проверено, нет
     lines += html_text(jp.get("description") or "")
+    if skills := [x.get("value") for x in jp.get("skills") or [] if isinstance(x, dict) and x.get("type") == "main"]:
+        lines.append("Requirements (must): " + ", ".join(skills))      # nofluff: обязательный стек отдельным полем
     return "\n".join(lines) + "\n"
 
 
@@ -124,35 +148,64 @@ def why(ex: dict, profile: dict) -> str:
 def scan(url: str, rates: dict, *, limit: int = 50, profile: dict | None = None, index_path: Path = tracker.INDEX,
          out: Path | None = None, get=fetch, delay: float = DELAY, log=print) -> Path:
     from .config import load_profile
+    if not url.startswith("https://justjoin.it/"):     # LinkedIn не качаем никогда: только jr add (вставка)
+        raise ValueError("jr scan — только ссылки https://justjoin.it/ (LinkedIn — через jr add)")
     profile = profile or load_profile()
     out = out or POOL / dt.date.today().isoformat()
     out.mkdir(parents=True, exist_ok=True)
     items = parse_list(get(url))[:limit]
     if not items:
         raise ValueError("на странице нет списка вакансий (ItemList) — вёрстка могла измениться")
-    rows = []
-    for n, it in enumerate(items, 1):
-        slug = it["url"].rstrip("/").rsplit("/", 1)[-1]
-        d = out / slug
-        f = d / "raw" / "001-justjoin.txt"
-        old = f.read_text(encoding="utf-8") if f.is_file() else ""
-        if "\nLanguages: " not in old:            # нет или скачано до поля языков — один раз докачать
-            time.sleep(delay)
-            page = get(it["url"])
-            jp = parse_offer(page)
-            if not jp:
-                log(f"[{n}/{len(items)}] пропуск, нет JobPosting: {it['url']}")
-                continue
-            f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(posting_text(jp, it["url"], parse_languages(page)), encoding="utf-8")
-        res = pipeline.run(d, rates, index_path=index_path, profile=profile, write_index=False)
-        sc = res["score"]
-        log(f"[{n}/{len(items)}] {sc['decision']:<9} fit {sc['fit']:>3} job {sc['job'] if sc['job'] is not None else 'н/д':>3}  {slug}")
-        rows.append({"slug": slug, "url": it["url"], "res": res})
+    rows = [r for n, it in enumerate(items, 1)
+            if (r := _one(it["url"], "justjoin", out, rates, profile, index_path, get, delay, log, f"[{n}/{len(items)}]"))]
     (out / "pool.md").write_text(pool_md(rows, profile, url), encoding="utf-8")
     seen = {"url": url, "at": dt.datetime.now().isoformat(timespec="seconds"), "slugs": [r["slug"] for r in rows]}
     (out / "scan.json").write_text(json.dumps(seen, ensure_ascii=False, indent=1), encoding="utf-8")   # для «пропала»
     return out / "pool.md"
+
+
+def _one(url, site, out, rates, profile, index_path, get, delay, log, tag) -> dict | None:
+    """Скачать страницу вакансии (если ещё нет) -> raw/001-<site>.txt -> оценка. None — на странице нет JobPosting."""
+    slug = url.rstrip("/").rsplit("/", 1)[-1]
+    d = out / slug
+    f = d / "raw" / f"001-{site}.txt"
+    old = f.read_text(encoding="utf-8") if f.is_file() else ""
+    if "\nLanguages: " not in old:            # нет или скачано до поля языков — один раз докачать
+        time.sleep(delay)
+        page = get(url)
+        jp = parse_offer(page)
+        if not jp:
+            log(f"{tag} пропуск, нет JobPosting: {url}")
+            return None
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(posting_text(jp, url, parse_languages(page)), encoding="utf-8")
+    res = pipeline.run(d, rates, index_path=index_path, profile=profile, write_index=False)
+    sc = res["score"]
+    log(f"{tag} {sc['decision']:<9} fit {sc['fit']:>3} job {sc['job'] if sc['job'] is not None else 'н/д':>3}  {slug}")
+    return {"slug": slug, "url": url, "res": res}
+
+
+def collect(urls: list[str], rates: dict, *, profile: dict | None = None, index_path: Path = tracker.INDEX,
+            out: Path | None = None, get=fetch, delay: float = DELAY, log=print) -> dict:
+    """Ссылки на вакансии со страницы списка (из расширения браузера) -> пул дня. Возвращает {решение: число}.
+
+    Все ссылки проверяются ДО первого запроса: одна чужая — отказ целиком (расширение шлёт только своё)."""
+    from .config import load_profile
+    urls = list(dict.fromkeys(u.split("?")[0].split("#")[0].rstrip("/") for u in urls))   # без utm, без дублей
+    if not urls:
+        raise ValueError("нет ссылок на вакансии")
+    if len(urls) > MAX_COLLECT:
+        raise ValueError(f"за раз до {MAX_COLLECT} вакансий, пришло {len(urls)}")
+    sites = [site_of(u) for u in urls]
+    profile = profile or load_profile()
+    out = out or POOL / dt.date.today().isoformat()
+    out.mkdir(parents=True, exist_ok=True)
+    got = {}
+    for n, (u, site) in enumerate(zip(urls, sites), 1):
+        r = _one(u, site, out, rates, profile, index_path, get, delay, log, f"[{n}/{len(urls)}]")
+        dec = r["res"]["score"]["decision"] if r else "нет данных"
+        got[dec] = got.get(dec, 0) + 1
+    return got
 
 
 def _key(r: dict):

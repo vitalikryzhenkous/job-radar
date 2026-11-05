@@ -31,7 +31,7 @@ risks:
   polish_c1_nice:         {penalty: 0,   target: fit}
   wrong_name:             {penalty: -5,  target: job}   # чужое имя = массовая рассылка
   onsite_other_city_1d:   {penalty: -5,  target: job}
-  onsite_other_city_2d:   {penalty: -10, target: job}
+  hybrid_days_unknown:    {penalty: 0,   target: job}   # apply -> clarify: спросить дни в офисе (до 1/нед)
   intermediary_chain:     {penalty: -5,  target: job}   # посредник подаёт в сервисную компанию, не конечному клиенту
   rtr_request:            {penalty: 0,   target: job}   # чек-лист перед подписью в score.pre_rtr
   submission_mismatch:    {penalty: 0,   target: job}   # submission расходится с профилем -> исправить до RTR
@@ -44,7 +44,8 @@ blockers:
   - java_banking_must
   - industrial_ml_must
   - phd_required
-  - onsite_other_city_3d
+  - onsite_over_max              # офис > 1 д/нед или полный офис (flags.ONSITE_MAX)
+  - english_above_max            # English выше уровня профиля (B2)
   - admin_role                   # админ/эксплуатация вместо разработки
   - non_dev_role                 # аналитик, консультант, product owner, PM — не разработка
   - polish_above_max             # польский выше A2 (flags.POLISH_MAX) обязателен

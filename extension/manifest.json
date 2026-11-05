@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Job Radar: в пул",
+  "version": "0.1.0",
+  "description": "Собирает ссылки на вакансии с открытой страницы списка и отправляет в локальный jr serve на оценку.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+KctPIZ1FlkHfmWgxJ8gs6oXU748uIzq4vpo49QowrBAAMiNmCwNwgsqUbL8uV1Hhd6o2NZFVSTn/H9XSALQQ0khuFbcmOPzLvBpiWdZ4AzMBYPfsUwMrbfCm6cVvtmMdN4S4kT4dwY3oecj4RK+YYVPKRvoQNWTNa3JZ+HiKZHgZFfSJ28SBsej5saNEpqffbkX8aX4eng8k5TgC0ngAMS/edQ1/UQ98nMo5M45itOcn3SPvNnTU5JBa+a751LjTthYa+54b5iHZwtnXrXDO4VqYkbPrNi2+jxNH0ed+qwaX64L0dsD2C4+7CIn/vXgGHU/zHNk2nAr3TIGFUeATwIDAQAB",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8766/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Job Radar: оценить вакансии со страницы",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

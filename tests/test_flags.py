@@ -43,7 +43,7 @@ def test_onsite_3d_blocker():
     e, _ = run("07-ai-engineer-warsaw-admin", 1)
     e = copy.deepcopy(e)
     e["location"]["onsite_days_per_week"] = 3
-    assert "onsite_other_city_3d" in codes(fl.check(e, PROFILE)["blockers"])
+    assert "onsite_over_max" in codes(fl.check(e, PROFILE)["blockers"])
 
 
 def test_scam():
@@ -80,3 +80,22 @@ def test_submission_rate_below_floor():
     e["submission"]["rate"] = {"amount": 900, "currency": "PLN", "unit": "day", "evidence": "Rate: 900 PLN/Day"}
     e["submission"]["ltd"] = False
     assert fl.submission_mismatch(e, PROFILE, FX) == ["ставка 900 PLN/день < floor 1050"]
+
+
+def test_english_above_profile():
+    e, _ = run("07-ai-engineer-warsaw-admin", 1)
+    e = copy.deepcopy(e)
+    e["languages"]["english_level"] = "C1"
+    assert "english_above_max" in codes(fl.check(e, PROFILE)["blockers"])
+    e["languages"]["english_level"] = "B2"
+    assert "english_above_max" not in codes(fl.check(e, PROFILE)["blockers"])
+
+
+def test_hybrid_days():
+    e, _ = run("07-ai-engineer-warsaw-admin", 1)
+    e = copy.deepcopy(e)
+    e["location"].update(remote="hybrid", onsite_days_per_week=2)
+    assert "onsite_over_max" in codes(fl.check(e, PROFILE)["blockers"])
+    e["location"]["onsite_days_per_week"] = None
+    f = fl.check(e, PROFILE)
+    assert "onsite_over_max" not in codes(f["blockers"]) and "hybrid_days_unknown" in codes(f["risks"])

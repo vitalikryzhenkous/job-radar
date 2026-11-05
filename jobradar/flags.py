@@ -6,6 +6,7 @@ import re
 from .extract import CEFR
 from .tracker import slugify
 
+ONSITE_MAX = 1              # hybrid: не больше 1 дня в офисе в неделю, иначе skip; дни не указаны -> clarify
 POLISH_MAX = "A2"          # владелец 2026-11-05: польский выше A2 обязателен -> skip; профиль может задать polish_max
 
 I = re.I
@@ -67,6 +68,10 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
     polish_blocked = bool(lvl) and CEFR.index(lvl) > CEFR.index(top)
     if polish_blocked:
         blockers.append(_risk("polish_above_max", f"Polish {lvl} (допустимо до {top})"))
+    en, en_top = ex["languages"].get("english_level"), (profile.get("languages") or {}).get("English", "B2")
+    en_top = en_top if en_top in CEFR else "B2"
+    if en and CEFR.index(en) > CEFR.index(en_top):
+        blockers.append(_risk("english_above_max", f"English {en} (у тебя {en_top})"))
     if ex["work_auth"] == "US" or (ex["residency_required"] or "").lower() in {"us", "usa", "united states"}:
         blockers.append(_risk("us_only", "US work authorization / residency"))
     elif ex["residency_required"] and ex["residency_required"].lower() not in HOME_COUNTRY:
@@ -80,8 +85,9 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
     if ex["degree"]["phd"]:
         blockers.append(_risk("phd_required", "PhD"))
     days = loc["onsite_days_per_week"]
-    if other_city and (loc["remote"] == "onsite" or (days or 0) >= 3):
-        blockers.append(_risk("onsite_other_city_3d", f"{other_city[0]}: {days or 'full'} d/week"))
+    if loc["remote"] == "onsite" or (loc["remote"] == "hybrid" and (days or 0) > ONSITE_MAX):   # правило 2026-11-05
+        where = (other_city or loc["cities"] or ["?"])[0]
+        blockers.append(_risk("onsite_over_max", f"офис {where}: {days or 'полный'} д/нед (допустимо до {ONSITE_MAX})"))
     if ex["role_class"] == "admin":
         blockers.append(_risk("admin_role", "admin_role_vs_builder_profile"))
     if ex["role_class"] == "non_dev":
@@ -108,8 +114,10 @@ def check(ex: dict, profile: dict, text: str = "", fx: dict | None = None) -> di
     wrong = [n for n in ex["greeting_names"] if first and n.lower() != first.lower()]
     if wrong:
         risks.append(_risk("wrong_name", f"Hi {wrong[0]}"))
-    if other_city and days in (1, 2) and loc["remote"] == "hybrid":
-        risks.append(_risk(f"onsite_other_city_{days}d", f"{other_city[0]}: {days} d/week"))
+    if other_city and days == 1 and loc["remote"] == "hybrid":
+        risks.append(_risk("onsite_other_city_1d", f"{other_city[0]}: 1 d/week"))
+    if loc["remote"] == "hybrid" and days is None:
+        risks.append(_risk("hybrid_days_unknown", f"hybrid {(loc['cities'] or ['?'])[0]}: дни в офисе не указаны"))
 
     if ex["poster"]["type"] == "intermediary" and ex.get("client_is_service_co"):
         risks.append(_risk("intermediary_chain", f"{ex['poster']['name'] or 'recruiter'} -> {ex['client']}"))

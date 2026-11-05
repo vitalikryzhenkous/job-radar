@@ -79,3 +79,44 @@ def test_api_guards(server):
     assert job.started.startswith("https://justjoin.it/")
     for bad in ("../etc", "..", "2026-11-05/../.."):
         assert post(port, "/api/move", {"slug": "x", "decision": "apply", "pool": bad})[0] == 400
+
+
+def test_seen_registry(tmp_path):
+    a, b = tmp_path / "2026-11-01", tmp_path / "2026-11-05"
+    a.mkdir(), b.mkdir()
+    old = [{"slug": "acme-dev", "company": "Acme", "role": "AI Dev", "url": "u1", "decision": "skip", "status": None},
+           {"slug": "beta-dev", "company": "Beta", "role": "Dev", "url": "u2", "decision": "apply", "status": {"status": "rejected"}}]
+    poolmap.remember(a, old)
+    new = [{"slug": "acme-dev-2", "company": "ACME", "role": "AI  Dev", "url": "u3", "decision": "apply", "status": None},
+           {"slug": "gamma-dev", "company": "Gamma", "role": "Dev", "url": "u4", "decision": "apply", "status": None},
+           {"slug": "beta-dev", "company": "Beta", "role": "Dev", "url": "u2", "decision": "apply", "status": None}]
+    reg = poolmap.remember(b, new)
+    keys = {poolmap._key(v["company"], v["role"]): v for v in reg.values()}
+    got = {r["slug"]: poolmap._prev(r, reg, keys, b.name) for r in new}
+    assert got["acme-dev-2"]["old_no"] and got["acme-dev-2"]["first"] == "2026-11-01"     # перевыложена: по компании+роли
+    assert got["beta-dev"]["old_no"] and got["gamma-dev"] is None
+    after = poolmap.seen_registry(tmp_path)
+    assert after["beta-dev"]["first"] == "2026-11-01" and after["beta-dev"]["last"] == "2026-11-05"
+    assert poolmap.remember(b, new) == after                                                 # повтор — без изменений
+
+
+def test_extension_id_matches_manifest():
+    import base64, hashlib
+    from helpers import FIX
+    key = json.loads((FIX.parent.parent / "extension" / "manifest.json").read_text(encoding="utf-8"))["key"]
+    h = hashlib.sha256(base64.b64decode(key)).hexdigest()[:32]
+    assert "".join(chr(ord("a") + int(c, 16)) for c in h) == serve.EXT_ID
+
+
+def test_collect_only_from_extension(server):
+    port, job, root = server
+    job._go = lambda fn: setattr(job, "went", True)                     # без сети и потоков
+    ext = f"chrome-extension://{serve.EXT_ID}"
+    good = {"urls": ["https://nofluffjobs.com/pl/job/frontend-developer-acme-remote"]}
+    assert post(port, "/api/collect", good, token="", origin=f"http://127.0.0.1:{port}")[0] == 403   # даже своя страница
+    assert post(port, "/api/collect", good, token="", origin="chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")[0] == 403
+    assert post(port, "/api/collect", good, token="")[0] == 403                                       # без Origin
+    code, j = post(port, "/api/collect", {"urls": ["https://www.linkedin.com/jobs/view/1"]}, token="", origin=ext)
+    assert code == 400 and not hasattr(job, "went")
+    assert post(port, "/api/collect", good, token="", origin=ext) == (200, {"ok": "started", "n": 1})
+    assert job.went

@@ -8,7 +8,8 @@
   jr map [дата]    пересчитать пул (без сети) и открыть карту в браузере (Fit × Job, города, черновики ответов)
   jr add           вставить вакансии в текущий пул (несколько — через строку ---), пересчёт и карта
   jr move <slug> apply|clarify|skip|auto "почему"   ручное решение в пуле (auto — снять)
-  jr serve [порт]  карта с рабочими кнопками: навыки, скан по ссылке, move, статусы (127.0.0.1, по умолч. 8766)
+  jr serve [порт] [--no-open]  карта с рабочими кнопками: навыки, скан по ссылке, move, статусы (127.0.0.1, по умолч. 8766);
+                   --no-open — не открывать браузер (служба systemd: deploy/jr-serve.service)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
@@ -156,9 +157,10 @@ def main(argv: list[str] | None = None) -> int:
             slug = poolmap.move(pool, args[1], args[2], args[3] if len(args) == 4 else "")
             print(f"{slug}: {args[2]}" + (f" — {args[3]}" if len(args) == 4 else ""))
             refresh_map(pool, fx.get_rates())
-        elif args[:1] == ["serve"] and len(args) <= 2:
+        elif args[:1] == ["serve"] and len([a for a in args if a != "--no-open"]) <= 2:
             from . import serve
-            serve.serve(int(args[1]) if len(args) == 2 else serve.PORT, opener=open_in_browser)
+            rest = [a for a in args[1:] if a != "--no-open"]
+            serve.serve(int(rest[0]) if rest else serve.PORT, opener=None if "--no-open" in args else open_in_browser)
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
             show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))
