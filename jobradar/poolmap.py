@@ -64,8 +64,21 @@ def rows(pool_dir: Path, profile: dict) -> list[dict]:
     return out
 
 
+def rescore(pool_dir: Path, fx: dict, profile: dict, index_path: Path) -> int:
+    """Пересчитать вакансии пула по сохранённым текстам (без сети): после правки профиля, весов, словарей."""
+    from . import pipeline
+    dirs = [p for p in sorted(pool_dir.iterdir()) if (p / "raw").is_dir()]
+    for d in dirs:
+        pipeline.run(d, fx, index_path=index_path, profile=profile, write_index=False)
+    return len(dirs)
+
+
+def latest() -> Path:
+    return max((p for p in POOL.iterdir() if p.is_dir()), key=lambda p: p.name)
+
+
 def render(pool_dir: Path | None = None, profile: dict | None = None) -> Path:
-    pool_dir = pool_dir or max((p for p in POOL.iterdir() if p.is_dir()), key=lambda p: p.name)
+    pool_dir = pool_dir or latest()
     profile = profile or load_profile()
     home = profile.get("location", {}).get("city", "")
     data = {"date": pool_dir.name, "home": ALIAS.get(home, home), "cities": CITY_XY,

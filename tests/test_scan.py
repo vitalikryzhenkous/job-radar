@@ -56,6 +56,7 @@ def test_map_html(tmp_path):
     pool = tmp_path / "2026-11-05"
     scan.scan("https://justjoin.it/job-offers/x", FX, profile=PROFILE, index_path=tmp_path / "i.csv", out=pool,
               get=fake_get([]), delay=0, log=lambda *a: None)
+    assert poolmap.rescore(pool, FX, PROFILE, tmp_path / "i.csv") == 2 and not (tmp_path / "i.csv").exists()
     html = poolmap.render(pool, PROFILE).read_text(encoding="utf-8")
     data = json.loads(html.split("const DATA = ", 1)[1].split(";\nconst DEC", 1)[0])
     assert {r["company"] for r in data["rows"]} == {"Northwind Labs", "Contoso"}

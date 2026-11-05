@@ -5,7 +5,7 @@
   jr show <slug>   показать verdict и черновик ответа без пересчёта
   jr ls            список вакансий
   jr scan <url>    пул с justjoin.it (до 50, пауза 2 с) -> jobs/_pool/<дата>/pool.md, index.csv не меняется
-  jr map [дата]    собрать и открыть карту пула в браузере (Fit × Job, города, черновики ответов)
+  jr map [дата]    пересчитать пул (без сети) и открыть карту в браузере (Fit × Job, города, черновики ответов)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 from . import fx, pipeline, poolmap, scan, tracker
-from .config import ROOT, ConfigError
+from .config import ROOT, ConfigError, load_profile
 from .extract import extract
 from .normalize import normalize
 
@@ -105,7 +105,10 @@ def main(argv: list[str] | None = None) -> int:
             md = scan.scan(args[1], fx.get_rates(), index_path=INDEX)
             print(f"Готово: {md}\nКарта: {poolmap.render(md.parent)}")
         elif args[:1] == ["map"] and len(args) <= 2:
-            out = poolmap.render(scan.POOL / args[1] if len(args) == 2 else None)
+            pool, profile = scan.POOL / args[1] if len(args) == 2 else poolmap.latest(), load_profile()
+            n = poolmap.rescore(pool, fx.get_rates(), profile, INDEX)     # профиль/словари могли измениться
+            out = poolmap.render(pool, profile)
+            print(f"Пересчитано: {n}")
             print(f"Карта: {out}" + ("" if open_in_browser(out) else " (открой файл в браузере)"))
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
