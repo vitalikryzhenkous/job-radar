@@ -4,10 +4,13 @@
   duplicate_by: job_id          # JOB-7MFKW, подан 2026-10-31
   risks: [polish_c1_must]
 02-forte-ai-product-engineer:
-  decision: apply               # ВОПРОС: Forte Group есть в index.csv (04.11), та же роль?
+  cases:
+    empty_index:  {decision: apply}
+    seeded_index: {decision: duplicate, duplicate_by: company_role}   # подан 2026-11-04
 03-inviso-applied-ai:
-  decision: apply
-  ask: [contract]               # ВОПРОС: противоречит правилу key_fields -> clarify
+  decision: apply               # direct-hire permanent = договор известен (UoP)
+  contract: [UoP]
+  call_notes: ["уточнить B2B на звонке"]
 04-avance-ai-fullstack:
   decision: clarify
   risks: [intermediary_no_client, hours_after_18, truncated]

@@ -30,7 +30,7 @@ risks:
   polish_c1_nice:         {penalty: 0,   target: fit}
   wrong_name:             {penalty: -5,  target: job}   # чужое имя = массовая рассылка
   onsite_other_city_1d:   {penalty: -5,  target: job}
-  onsite_other_city_2d:   {penalty: -10, target: job}   # ПРЕДВАРИТЕЛЬНО, не задано владельцем
+  onsite_other_city_2d:   {penalty: -10, target: job}
 
 # Блокеры: балл 0, решение skip.
 blockers:
@@ -48,6 +48,7 @@ decision:
   research_min: 50               # исследование, если оба >= 50 и есть missing
   key_fields: [rate, contract, client]   # нет любого -> clarify
 
+# Дорога вычитается из ставки перед сравнением с рынком (money), не штраф.
 travel:
   other_city_trip_pln: 200       # одна поездка туда-обратно
   weeks_per_month: 4.33
