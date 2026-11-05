@@ -1,0 +1,53 @@
+# Веса баллов. Меняешь здесь — score.py пересчитает без правки кода.
+
+fit:                      # соответствие, сумма 100
+  role:                   # 30 максимум, по классу роли
+    fde_applied_ai: 30
+    fullstack_ai: 20
+    fullstack: 10
+    other: 0
+  stack: 25
+  level: 15
+  must: 20
+  lang_degree: 10
+
+job:                      # вакансия, сумма 100
+  money: 30               # против market.yaml
+  contract: 20            # B2B, удалёнка или Познань гибрид
+  company: 20             # компания и отзывы
+  process: 10
+  direct: 10              # прямой работодатель = 10, посредник с клиентом = 5, без клиента = 0
+  hours: 10
+
+# Риски: штраф и к какому баллу применяется (fit | job).
+risks:
+  intermediary_no_client: {penalty: -10, target: job}
+  hours_after_18:         {penalty: -5,  target: job}   # не применять, если ставка >= рынка
+  cs_degree_required:     {penalty: -5,  target: fit}
+  python_5y_must:         {penalty: -10, target: fit}
+  truncated:              {penalty: -5,  target: job}
+  polish_c1_must:         {penalty: -10, target: fit}
+  polish_c1_nice:         {penalty: 0,   target: fit}
+  wrong_name:             {penalty: -5,  target: job}   # чужое имя = массовая рассылка
+  onsite_other_city_1d:   {penalty: -5,  target: job}
+  onsite_other_city_2d:   {penalty: -10, target: job}   # ПРЕДВАРИТЕЛЬНО, не задано владельцем
+
+# Блокеры: балл 0, решение skip.
+blockers:
+  - us_only
+  - foreign_residency
+  - level_below_senior
+  - java_banking_must
+  - industrial_ml_must
+  - phd_required
+  - onsite_other_city_3d
+
+decision:
+  apply: {fit: 70, job: 60}      # оба порога -> apply
+  skip_below: 50                 # оба < 50 -> skip
+  research_min: 50               # исследование, если оба >= 50 и есть missing
+  key_fields: [rate, contract, client]   # нет любого -> clarify
+
+travel:
+  other_city_trip_pln: 200       # одна поездка туда-обратно
+  weeks_per_month: 4.33

@@ -1,0 +1,23 @@
+# Рыночные ставки B2B Польша, PLN/ч netto.
+# Это оценки. Обновлять из шага 6 (research) — только со ссылкой в source.
+as_of: 2026-11-05
+currency: PLN
+unit: hour
+contract: B2B
+
+roles:
+  fullstack_senior:
+    min: 140
+    max: 180
+    source: "оценка владельца в ТЗ, не проверена исследованием"
+  applied_ai_senior:
+    min: 150
+    max: 190
+    source: "оценка владельца в ТЗ, не проверена исследованием"
+
+# Класс роли из extract.json -> строка рынка
+role_map:
+  fde_applied_ai: applied_ai_senior
+  fullstack_ai: applied_ai_senior
+  fullstack: fullstack_senior
+  other: fullstack_senior

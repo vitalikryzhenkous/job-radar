@@ -1,0 +1,13 @@
+# секреты и окружение
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# личные данные: не в публичный репо
+profile/*.pdf
+config/profile.yaml
+jobs/
+index.csv
+logs/
