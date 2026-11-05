@@ -1,22 +1,15 @@
 """Загрузка конфигов. Ошибки — понятным текстом, без трейсбеков для пользователя."""
 from __future__ import annotations
 
-import datetime as dt
-import warnings
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
-FX_MAX_AGE_DAYS = 30
 
 
 class ConfigError(Exception):
-    pass
-
-
-class StaleFxWarning(UserWarning):
     pass
 
 
@@ -43,16 +36,3 @@ def load_profile(path: Path | str | None = None) -> dict:
         raise ConfigError(f"stories_path не найден: {stories} (задан в {path})")
     profile["stories_path"] = str(stories)
     return profile
-
-
-def load_fx(path: Path | str | None = None, today: dt.date | None = None) -> dict:
-    fx = load_yaml(path or CONFIG / "fx.yaml")
-    as_of = fx.get("as_of")
-    if not isinstance(as_of, dt.date):
-        raise ConfigError("fx.yaml: as_of должен быть датой YYYY-MM-DD")
-    age = ((today or dt.date.today()) - as_of).days
-    if age > FX_MAX_AGE_DAYS:
-        warnings.warn(
-            f"Курс в fx.yaml от {as_of} ({age} дн.), обнови", StaleFxWarning, stacklevel=2
-        )
-    return fx

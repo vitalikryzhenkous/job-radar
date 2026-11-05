@@ -6,7 +6,7 @@ import collections
 import sys
 from pathlib import Path
 
-from . import tracker
+from . import fx, tracker
 from .config import ConfigError
 
 
@@ -29,6 +29,13 @@ def _status(_args) -> int:
     return 0
 
 
+def _fx(_args) -> int:
+    r = fx.get_rates()
+    rates = ", ".join(f"{k} {v}" for k, v in r["to_pln"].items() if k != "PLN")
+    print(f"{rates} | fx_source={r['fx_source']} fx_origin={r['fx_origin']} fx_date={r['fx_date']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="jobradar")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -46,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     sd.add_argument("csv")
     sd.set_defaults(func=_seed)
 
+    sub.add_parser("fx", help="текущий курс и его источник").set_defaults(func=_fx)
     sub.add_parser("status", help="сводка index.csv").set_defaults(func=_status)
 
     args = p.parse_args(argv)
