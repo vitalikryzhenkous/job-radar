@@ -66,6 +66,19 @@ summary { cursor: pointer; font-weight: 600; }
 a { color: var(--accent); }
 .short { padding: 10px 16px; }
 .empty { padding: 30px; text-align: center; color: var(--muted); }
+.tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-right: 6px; color: var(--muted); }
+.tag.new { color: var(--accent); border-color: var(--accent); }
+.tag.st { color: var(--apply); border-color: var(--apply); }
+.row.gone { opacity: .5; }
+select, .tools input { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.tools input { min-width: 240px; }
+.skills { padding: 6px 8px; }
+.skills table { width: 100%; border-collapse: collapse; }
+.skills td, .skills th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.skills th { font-weight: 600; color: var(--muted); font-size: 12px; }
+.skills h3 { font-size: 14px; margin: 12px 6px 4px; }
+.linkish { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
 </style>
 </head>
 <body>
@@ -75,7 +88,9 @@ a { color: var(--accent); }
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="fit">Fit × Job</button>
     <button role="tab" aria-selected="false" data-tab="geo">Города</button>
+    <button role="tab" aria-selected="false" data-tab="skills">Навыки</button>
   </div>
+  <div class="tools" id="tools"></div>
 </header>
 <div class="controls" id="controls"></div>
 <main>
@@ -95,32 +110,64 @@ const TARGET_H = 1500 / 8;   // цель 1500 PLN/день
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const state = { tab: "fit", dec: new Set(["apply", "clarify"]), q: "", rateOk: false, city: null, sel: null,
+                mode: new Set(store.get("jr-mode", ["full", "hybrid", "none"])), gone: false, sort: store.get("jr-sort", "dec"),
                 stars: new Set(store.get("jr-stars-" + DATA.date, [])) };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const mid = r => r.rate ? (r.rate[0] + r.rate[1]) / 2 : null;
 const rateTxt = r => r.rate ? `${Math.round(r.rate[0])}–${Math.round(r.rate[1])} PLN/ч` : "ставка ?";
 const ORDER = { apply: 0, clarify: 1, skip: 2, duplicate: 3, stop_scam: 4 };
+const ST_RU = { applied: "подался", replied: "ответили", call: "звонок", offer: "оффер", rejected: "отказ" };
+const MODE_RU = { full: "remote", hybrid: "hybrid", onsite: "офис", none: "формат ?" };
+const mode = r => r.remote ?? "none";
+const API = DATA.api;          // есть только под jr serve: кнопки пишут сразу
+async function api(path, body) {
+  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-JR-Token": API.token },
+                                  body: JSON.stringify({ pool: DATA.date, ...body }) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || res.status);
+  return j;
+}
+const reload = () => { store.set("jr-sel", state.sel); store.set("jr-tab", state.tab); location.reload(); };
+const fail = e => alert("Не получилось: " + e.message);
 
-function visible() {
+function base(r) {           // все фильтры, кроме города
   const q = state.q.toLowerCase();
-  return DATA.rows.filter(r => state.dec.has(r.decision)
+  return state.dec.has(r.decision) && state.mode.has(mode(r)) && (state.gone || !r.gone)
     && (!q || (r.company + " " + r.role + " " + r.why).toLowerCase().includes(q))
-    && (!state.rateOk || (r.rate && r.rate[1] >= TARGET_H))
-    && (!state.city || r.city === state.city))
-    .sort((a, b) => ORDER[a.decision] - ORDER[b.decision] || b.fit - a.fit || (b.job ?? -1) - (a.job ?? -1));
+    && (!state.rateOk || (r.rate && r.rate[1] >= TARGET_H));
+}
+const dist = r => r.remote === "full" ? 0 : r.km ?? 9999;
+const SORT = {
+  dec: (a, b) => ORDER[a.decision] - ORDER[b.decision] || b.fit - a.fit || (b.job ?? -1) - (a.job ?? -1),
+  fit: (a, b) => b.fit - a.fit, job: (a, b) => (b.job ?? -1) - (a.job ?? -1),
+  rate: (a, b) => (mid(b) ?? -1) - (mid(a) ?? -1), km: (a, b) => dist(a) - dist(b) || b.fit - a.fit,
+  status: (a, b) => !!b.status - !!a.status || SORT.dec(a, b),
+};
+function visible() {
+  return DATA.rows.filter(r => base(r) && (!state.city || r.city === state.city)).sort((a, b) => SORT[state.sort](a, b) || SORT.dec(a, b));
 }
 
 function controls() {
   const n = d => DATA.rows.filter(r => r.decision === d).length;
   $("#controls").innerHTML = Object.keys(DEC).filter(n).map(d =>
     `<button class="chip" data-dec="${d}" aria-pressed="${state.dec.has(d)}"><i style="background:${DEC[d]}"></i>${DEC_RU[d]} ${n(d)}</button>`).join("")
+    + ["full", "hybrid", "onsite", "none"].filter(m => DATA.rows.some(r => mode(r) === m)).map(m =>
+      `<button class="chip" data-mode="${m}" aria-pressed="${state.mode.has(m)}">${MODE_RU[m]} ${DATA.rows.filter(r => mode(r) === m).length}</button>`).join("")
+    + (DATA.rows.some(r => r.gone) ? `<button class="chip" id="gone" aria-pressed="${state.gone}" title="были в пуле, но нет в последнем скане">пропавшие ${DATA.rows.filter(r => r.gone).length}</button>` : "")
     + `<button class="chip" id="rate" aria-pressed="${state.rateOk}">верх ставки ≥ 1500/день</button>`
+    + `<select id="sort" title="сортировка списка">${Object.entries({ dec: "по решению", fit: "по fit", job: "по job", rate: "по ставке", km: "по расстоянию", status: "сначала с откликом" })
+      .map(([k, v]) => `<option value="${k}" ${state.sort === k ? "selected" : ""}>${v}</option>`).join("")}</select>`
     + `<input type="search" id="q" placeholder="поиск: компания, роль, стек" value="${esc(state.q)}">`
     + (state.city ? `<button class="chip" id="city">город: ${esc(state.city)} ✕</button>` : "");
   document.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => {
     state.dec.has(b.dataset.dec) ? state.dec.delete(b.dataset.dec) : state.dec.add(b.dataset.dec); draw(); });
   $("#rate").onclick = () => { state.rateOk = !state.rateOk; draw(); };
+  document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
+    state.mode.has(b.dataset.mode) ? state.mode.delete(b.dataset.mode) : state.mode.add(b.dataset.mode);
+    store.set("jr-mode", [...state.mode]); draw(); });
+  if ($("#gone")) $("#gone").onclick = () => { state.gone = !state.gone; draw(); };
+  $("#sort").onchange = e => { state.sort = e.target.value; store.set("jr-sort", state.sort); drawBody(); };
   $("#q").oninput = e => { state.q = e.target.value; drawBody(); };
   if ($("#city")) $("#city").onclick = () => { state.city = null; draw(); };
 }
@@ -160,7 +207,7 @@ const PL = [[14.2,53.9],[16.0,54.25],[17.0,54.7],[18.4,54.8],[19.6,54.45],[22.8,
 function geoChart(rows) {
   const W = 640, H = 560, k = Math.cos(52 * Math.PI / 180), s0 = 64;
   const px = ([lo, la]) => [30 + (lo - 14) * k * s0 * 1.55, 20 + (55 - la) * s0 * 1.55 * .9];
-  const all = DATA.rows.filter(r => state.dec.has(r.decision));
+  const all = DATA.rows.filter(base);
   const by = {};
   all.forEach(r => { (by[r.city || "?"] ||= []).push(r); });
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Схема Польши с городами вакансий">`
@@ -186,10 +233,16 @@ function geoChart(rows) {
 
 function list(rows) {
   if (!rows.length) return `<div class="empty">Ничего не подходит под фильтры</div>`;
-  return rows.map(r => `<div class="row ${state.sel === r.slug ? "sel" : ""}" data-slug="${r.slug}">
+  return rows.map(r => `<div class="row ${state.sel === r.slug ? "sel" : ""} ${r.gone ? "gone" : ""}" data-slug="${r.slug}">
     <button class="star-btn ${state.stars.has(r.slug) ? "on" : ""}" data-star="${r.slug}" title="в шортлист">${state.stars.has(r.slug) ? "★" : "☆"}</button>
-    <div class="t"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i><b>${esc(r.company)}</b> — ${esc(r.role)}</div>
+    <div class="t">${r.manual !== null ? "✋ " : ""}<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i>${tags(r)}<b>${esc(r.company)}</b> — ${esc(r.role)}</div>
     <div class="n">fit ${r.fit} · job ${r.job ?? "н/д"} · ${rateTxt(r)}</div></div>`).join("");
+}
+
+function tags(r) {
+  return (r.new ? `<span class="tag new">новая</span>` : "") + (r.gone ? `<span class="tag">пропала</span>` : "")
+    + (r.remote !== "full" && r.remote ? `<span class="tag">${MODE_RU[mode(r)]}${r.city && r.city !== DATA.home ? " " + esc(r.city) : ""}</span>` : "")
+    + (r.taken ? `<span class="tag">в jobs: ${esc(r.taken)}</span>` : "") + (r.status ? `<span class="tag st">${ST_RU[r.status.status]}</span>` : "");
 }
 
 function copy(text, btn) {
@@ -209,12 +262,24 @@ function detail() {
     ${r.money_note ? `<div>💰 ${esc(r.money_note)}</div>` : ""}
     <div style="margin-top:6px">🧩 ${esc(r.why)}</div>
     ${r.risks.length ? `<div style="margin-top:6px">⚠️ ${r.risks.map(esc).join(", ")}</div>` : ""}
-    <div style="margin-top:6px" class="muted">Причина решения: ${esc(r.reason)}</div>
+    ${r.remote && r.remote !== "full" && r.city !== DATA.home ? `<div style="margin-top:6px">🏢 ${MODE_RU[mode(r)]} не в ${esc(DATA.home)} — в профиле hybrid только ${esc(DATA.home)}</div>` : ""}
+    ${r.gone ? `<div style="margin-top:6px" class="muted">Нет в последнем скане сайта — вакансию могли закрыть.</div>` : ""}
+    <div class="actions"><span class="muted">Отклик:</span>
+      ${API ? `<select id="st-sel"><option value="">— не подавался</option>${DATA.statuses.map(s => `<option value="${s}" ${r.status?.status === s ? "selected" : ""}>${ST_RU[s]}</option>`).join("")}</select>`
+            : esc(r.status ? ST_RU[r.status.status] : "—")}
+      ${r.status ? `<span class="muted">с ${esc(r.status.date)}${r.status.note ? " · " + esc(r.status.note) : ""}</span>` : ""}
+      ${r.taken ? `<span class="muted">· в jobs/ (index: ${esc(r.taken)})</span>` : ""}</div>
+    ${r.manual !== null ? `<div style="margin-top:6px">✋ <b>вручную</b> (скрипт: ${DEC_RU[r.auto]})${r.manual ? ": " + esc(r.manual) : ""}</div>` : ""}
+    <div style="margin-top:6px" class="muted">Причина решения скрипта: ${esc(r.reason)}</div>
     <div class="actions">
       <a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener">открыть вакансию</a>
       <button class="btn" id="cp-take">копировать: jr take</button>
       <button class="btn" id="cp-eval">копировать: /job-eval</button>
       <button class="btn" id="st">${state.stars.has(r.slug) ? "★ в шортлисте" : "☆ в шортлист"}</button>
+    </div>
+    <div class="actions"><span class="muted">Неверное решение? ${API ? "Перенести:" : "Скопировать команду:"}</span>
+      ${["apply", "clarify", "skip"].filter(d => d !== r.decision).map(d => `<button class="btn" data-move="${d}">→ ${DEC_RU[d]}</button>`).join("")}
+      ${r.manual !== null ? `<button class="btn" data-move="auto">снять ручное</button>` : ""}
     </div>
     ${r.call_notes.length ? `<details open><summary>Спросить на звонке</summary><ul>${r.call_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
     ${r.reply ? `<details open><summary>Черновик ответа (шаблон ${esc(r.template)})</summary>
@@ -225,6 +290,18 @@ function detail() {
   $("#cp-take").onclick = e => copy(`jr take ${r.slug}`, e.target);
   $("#cp-eval").onclick = e => copy(`/job-eval ${r.slug}`, e.target);
   $("#st").onclick = () => toggleStar(r.slug);
+  document.querySelectorAll("[data-move]").forEach(b => b.onclick = () => {
+    const d = b.dataset.move;
+    if (!API) return copy(`jr move ${r.slug} ${d}` + (d === "auto" ? "" : ` "почему"`), b);
+    const why = d === "auto" ? "" : prompt("Почему? (видно на карте)", "");
+    if (why === null) return;
+    api("/api/move", { slug: r.slug, decision: d, why }).then(reload, fail);
+  });
+  if ($("#st-sel")) $("#st-sel").onchange = e => {
+    const note = e.target.value ? prompt("Заметка (необязательно): кому, где", r.status?.note || "") : "";
+    if (note === null) return detail();
+    api("/api/status", { slug: r.slug, status: e.target.value, note }).then(reload, fail);
+  };
   if ($("#cp-reply")) $("#cp-reply").onclick = e => copy($("#reply").value, e.target);
 }
 
@@ -240,9 +317,61 @@ function toggleStar(slug) {
   store.set("jr-stars-" + DATA.date, [...state.stars]); drawBody();
 }
 
+function skillsPanel() {
+  const rs = DATA.rows.filter(base), gap = {};
+  rs.forEach(r => r.gaps.forEach(g => gap[g] = (gap[g] || 0) + 1));
+  const known = new Set(DATA.skills.map(s => s.name.toLowerCase()));
+  const lvl = (name, cur) => API
+    ? `<select data-skill="${esc(name)}">${cur ? "" : `<option value="">— добавить</option>`}${DATA.levels.map(l => `<option ${l === cur ? "selected" : ""}>${l}</option>`).join("")}</select>`
+    : esc(cur ?? "—");
+  const gaps = Object.entries(gap).sort((a, b) => b[1] - a[1]).slice(0, 30);
+  return `<div class="skills">
+    <div class="muted" style="padding:0 6px">Вес: strong / core / production — 1, basic / pet — 0.5, none — 0.
+      ${API ? "Смена уровня: бэкап profile.yaml в logs/ → правка строки → пересчёт пула." : "Менять уровни — в <b>jr serve</b>; здесь только просмотр."}</div>
+    <h3>Чего не хватает по видимым вакансиям (${rs.length})</h3>
+    ${gaps.length ? `<table><tr><th>навык</th><th>вакансий</th><th>${API ? "добавить как" : "в профиле"}</th></tr>${gaps.map(([g, n]) =>
+      `<tr><td><button class="linkish" data-q="${esc(g)}" title="показать эти вакансии">${esc(g)}</button></td><td>${n}</td><td>${known.has(g.toLowerCase())
+        ? esc(DATA.skills.find(s => s.name.toLowerCase() === g.toLowerCase()).level) : lvl(g, null)}</td></tr>`).join("")}</table>`
+      : `<div class="empty">Пробелов нет</div>`}
+    <h3>Мои навыки (${DATA.skills.length})</h3>
+    <table><tr><th>навык</th><th>уровень</th><th>заметка</th></tr>${DATA.skills.map(s =>
+      `<tr><td>${esc(s.name)}</td><td>${lvl(s.name, s.level)}</td><td class="muted">${esc(s.note)}</td></tr>`).join("")}</table></div>`;
+}
+
+function tools() {
+  const theme = store.get("jr-theme", "system");
+  if (theme !== "system") document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme;
+  $("#tools").innerHTML = `<button class="btn" id="theme" title="тема">тема: ${{ system: "система", light: "светлая", dark: "тёмная" }[theme]}</button>`
+    + (API && DATA.pools.length > 1 ? `<select id="pool" title="пул">${DATA.pools.map(p => `<option ${p === DATA.date ? "selected" : ""}>${p}</option>`).join("")}</select>` : "")
+    + `<input id="scan-url" placeholder="ссылка justjoin.it со списком вакансий">`
+    + `<button class="btn" id="scan">${API ? "загрузить список" : "копировать: jr scan"}</button><span class="muted" id="scan-log"></span>`;
+  $("#theme").onclick = () => { store.set("jr-theme", { system: "light", light: "dark", dark: "system" }[theme]); tools(); };
+  if ($("#pool")) $("#pool").onchange = e => location.href = "/?pool=" + encodeURIComponent(e.target.value);
+  $("#scan").onclick = e => {
+    const url = $("#scan-url").value.trim();
+    if (!/^https:\/\/justjoin\.it\//.test(url)) return alert("Нужна ссылка https://justjoin.it/… (LinkedIn — через jr add)");
+    if (!API) return copy(`jr scan "${url}"`, e.target);
+    e.target.disabled = true;
+    api("/api/scan", { url }).then(poll, err => { e.target.disabled = false; fail(err); });
+  };
+}
+async function poll() {
+  const j = await (await fetch("/api/job")).json();
+  $("#scan-log").textContent = j.error ? "ошибка: " + j.error : (j.log.at(-1) || "старт…");
+  if (j.running) return setTimeout(poll, 1500);
+  $("#scan").disabled = false;
+  if (j.pool) location.href = "/?pool=" + encodeURIComponent(j.pool);
+}
+
 function drawBody() {
   const rows = visible();
-  $("#chart").innerHTML = state.tab === "fit" ? fitChart(rows) : geoChart(rows);
+  $("#chart").innerHTML = state.tab === "fit" ? fitChart(rows) : state.tab === "geo" ? geoChart(rows) : skillsPanel();
+  document.querySelectorAll("[data-skill]").forEach(el => el.onchange = () => {
+    if (!el.value) return;
+    el.disabled = true;
+    api("/api/skill", { name: el.dataset.skill, level: el.value }).then(reload, e => { el.disabled = false; fail(e); });
+  });
+  document.querySelectorAll("[data-q]").forEach(el => el.onclick = () => { state.q = el.dataset.q; draw(); });
   $("#list").innerHTML = list(rows);
   document.querySelectorAll("[data-slug]").forEach(el => el.onclick = e => {
     if (e.target.dataset.star) return; state.sel = el.dataset.slug; drawBody(); });
@@ -258,9 +387,13 @@ document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
   document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x === b));
   drawBody();
 });
-if (location.hash === "#geo") { state.tab = "geo"; document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x.dataset.tab === "geo")); }
-$("#meta").textContent = `пул ${DATA.date} · ${DATA.rows.length} вакансий · дом: ${DATA.home}`;
-state.sel = visible()[0]?.slug ?? null;
+state.tab = ["#fit", "#geo", "#skills"].includes(location.hash) ? location.hash.slice(1) : store.get("jr-tab", "fit");
+store.set("jr-tab", null);
+document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x.dataset.tab === state.tab));
+$("#meta").textContent = `пул ${DATA.date} · ${DATA.rows.length} вакансий · дом: ${DATA.home}` + (API ? " · jr serve" : "");
+const keep = store.get("jr-sel", null); store.set("jr-sel", null);
+state.sel = DATA.rows.some(r => r.slug === keep) ? keep : visible()[0]?.slug ?? null;
+tools();
 draw();
 </script>
 </body>

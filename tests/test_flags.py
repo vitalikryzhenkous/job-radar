@@ -18,7 +18,8 @@ def codes(items):
 
 def test_sii_risks():
     _, f = run("01-sii-fde")
-    assert codes(f["risks"]) == ["polish_c1_must", "python_must"]
+    assert codes(f["risks"]) == ["python_must"]
+    assert codes(f["blockers"]) == ["polish_above_max"]
 
 
 def test_avance_risks():

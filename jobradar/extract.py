@@ -42,6 +42,22 @@ YEARS = re.compile(r"(\d+)\s*(?:\+|–\s*\d+|-\s*\d+)?\s*(?:\+\s*)?(?:years?|yrs
 GENERAL_CTX = re.compile(r"^\W*(?:of\s+)?(?:experience\s+)?(?:in|of|with)?\s*(software|engineering|development|experience|professional|full-stack|commercial)", I)
 AI_CTX = re.compile(r"\b(ai|artificial intelligence|llm|ml|machine learning|genai)\b", I)
 POLISH_HI = re.compile(r"(advanced|fluent|c1|c2|native|proficient)[^.]{0,30}\bpolish\b|\bpolish\b[^.]{0,20}(advanced|fluent|c1|c2|native)", I)
+# уровень польского: CEFR или слово; «Languages:» — строка из jr scan (поле languages страницы justjoin)
+_PL_LVL = r"(A1|A2|B1|B2|C1|C2|native|fluent|advanced|proficient|intermediate|communicative|basic)"
+POLISH_LVL = re.compile(rf"\b{_PL_LVL}\b[^.\n]{{0,30}}\bpolish\b|\bpolish\b[^.\n,;]{{0,25}}\b{_PL_LVL}\b", I)
+LANG_LINE = re.compile(r"^Languages:[^\n]*\bPolish ([ABC][12])\b", re.M)
+CEFR = ("A1", "A2", "B1", "B2", "C1", "C2")
+PL_WORD = {"native": "C2", "fluent": "C1", "advanced": "C1", "proficient": "C1", "intermediate": "B1",
+           "communicative": "B1", "basic": "A2"}
+
+
+def polish_level(text: str, req_text: str) -> str | None:
+    """Самый высокий требуемый уровень польского (CEFR) или None."""
+    found = [m[1] for m in LANG_LINE.finditer(text)]
+    found += [PL_WORD.get((m[1] or m[2]).lower(), (m[1] or m[2]).upper()) for m in POLISH_LVL.finditer(req_text)]
+    return max(found, key=CEFR.index) if found else None
+
+
 ENGLISH_HI = re.compile(r"(c1|c2|native|fluent)[^.]{0,20}\benglish\b|\benglish\b[^.]{0,20}(c1|c2|native)", I)
 DEGREE = re.compile(r"\b(BS|BSc|B\.S\.|bachelor'?s?|master'?s?|MSc|degree)\b[^.]{0,40}\b(computer science|CS|engineering|IT)\b", I)
 DEGREE_SOFT = re.compile(r"or equivalent (practical )?experience|preferred|nice to have", I)
@@ -302,7 +318,8 @@ def extract(n: Normalized, fx: dict, on: dt.date | None = None) -> dict:
         "rate": rate,
         "stack": {"must": tech_groups(req), "nice": tech_groups(nice)},
         "years": years,
-        "languages": {"polish_high": polish, "english_high": bool(ENGLISH_HI.search(req_text))},
+        "languages": {"polish_high": polish, "polish_level": polish_level(text, req_text),
+                      "english_high": bool(ENGLISH_HI.search(req_text))},
         "degree": {"required": bool(degree) and not DEGREE_SOFT.search(degree.string[degree.start():degree.end() + 60]),
                    "cs": bool(degree), "phd": bool(PHD.search(req_text)),
                    "evidence": degree.group(0) if degree else None},

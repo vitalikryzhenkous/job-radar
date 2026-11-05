@@ -210,7 +210,7 @@ def decide(ex: dict, flags: dict, fit: float, job: float | None, coverage: float
         return "stop_scam", flags["scam"][0]["code"]
     if flags["blockers"]:
         b = flags["blockers"][0]
-        return "skip", b["evidence"] if b["code"] in ("admin_role", "non_dev_role") else b["code"]
+        return "skip", b["evidence"] if b["code"] in ("admin_role", "non_dev_role", "polish_above_max") else b["code"]
     if dups:
         return "duplicate", f"{dups[0]['by']}: {dups[0]['slug']}"
     if ex["source_kind"] == "outreach" and ex["missing"]:
