@@ -5,13 +5,15 @@
   jr show <slug>   показать verdict и черновик ответа без пересчёта
   jr ls            список вакансий
   jr scan <url>    пул с justjoin.it (до 50, пауза 2 с) -> jobs/_pool/<дата>/pool.md, index.csv не меняется
-  jr map [дата]    карта пула -> jobs/_pool/<дата>/map.html (Fit × Job, города, черновики ответов)
+  jr map [дата]    собрать и открыть карту пула в браузере (Fit × Job, города, черновики ответов)
   jr take <slug>   вакансия из пула -> jobs/<slug> + index.csv (status new)
 """
 from __future__ import annotations
 
 import datetime as dt
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -74,6 +76,15 @@ def show(d: Path, res: dict | None = None) -> None:
     print(f"\nПапка: {d}")
 
 
+def open_in_browser(path: Path) -> bool:
+    """WSL: открыть файл в браузере Windows по умолчанию. Нет explorer.exe — просто вернуть False."""
+    if not shutil.which("explorer.exe"):
+        return False
+    win = subprocess.run(["wslpath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
+    subprocess.run(["explorer.exe", win], capture_output=True)   # explorer.exe возвращает 1 даже при успехе
+    return True
+
+
 def ls() -> None:
     rows = tracker.read_index(INDEX)
     if not rows:
@@ -95,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Готово: {md}\nКарта: {poolmap.render(md.parent)}")
         elif args[:1] == ["map"] and len(args) <= 2:
             out = poolmap.render(scan.POOL / args[1] if len(args) == 2 else None)
-            print(f"Карта: {out}\nОткрыть в Windows: explorer.exe \"$(wslpath -w {out})\"")
+            print(f"Карта: {out}" + ("" if open_in_browser(out) else " (открой файл в браузере)"))
         elif args[:1] == ["take"] and len(args) == 2:
             d = scan.take(args[1], jobs=JOBS)
             show(d, pipeline.run(d, fx.get_rates(), index_path=INDEX))
