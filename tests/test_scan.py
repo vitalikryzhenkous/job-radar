@@ -145,3 +145,33 @@ def test_collect_nofluff(tmp_path):
     with pytest.raises(ValueError):                                     # одна чужая ссылка — отказ до сети
         scan.collect([urls[0], "https://www.linkedin.com/jobs/view/1"], FX, profile=PROFILE, out=tmp_path,
                      get=lambda u: (_ for _ in ()).throw(AssertionError("сеть")), delay=0)
+
+
+def test_card_key():
+    k = scan.card_key
+    assert k("Xebia sp. z o.o.", "Senior React Dev") == k("XEBIA", "senior  react dev") == "xebia|senior react dev"
+    assert k("Łódź Soft S.A.", "Dev") == k("Lodz Soft Polska", "Dev")
+    assert k("EPAM Systems", "Dev") != k("EPAM Systems", "Senior Dev")
+    assert k(None, "Dev") == k("Acme", "") == ""
+
+
+def test_collect_dup_not_scored(tmp_path):
+    """Та же компания+роль в другом городе: одна карточка, дубль без оценки, в итоге — «duplicate»."""
+    import json
+    from jobradar import poolmap
+    get = lambda u: NFJ_PAGE
+    urls = ["https://nofluffjobs.com/pl/job/frontend-developer-acme-remote",
+            "https://nofluffjobs.com/pl/job/frontend-developer-acme-warszawa"]
+    got = scan.collect(urls, FX, profile=PROFILE, out=tmp_path, get=get, delay=0, log=lambda s: None,
+                       index_path=tmp_path / "index.csv")
+    dup = tmp_path / "frontend-developer-acme-warszawa"
+    assert got.pop("duplicate") == 1 and sum(got.values()) == 1
+    assert not (dup / "score.json").exists()
+    assert json.loads((dup / "dup.json").read_text())["of"] == "frontend-developer-acme-remote"
+    assert json.loads((tmp_path / "collect.json").read_text())["slugs"] == ["frontend-developer-acme-remote"]
+    rows = poolmap._merge_dups(tmp_path, [{"slug": "frontend-developer-acme-remote", "city": ""}])
+    assert [o["slug"] for o in rows[0]["others"]] == [dup.name]
+    again = scan.collect(urls[1:], FX, profile=PROFILE, out=tmp_path, get=get, delay=0, log=lambda s: None,
+                         index_path=tmp_path / "index.csv")
+    assert "duplicate" not in again and sum(again.values()) == 1       # повторный сбор: карточка та же, без новой
+    assert json.loads((tmp_path / "collect.json").read_text())["slugs"] == ["frontend-developer-acme-remote"]

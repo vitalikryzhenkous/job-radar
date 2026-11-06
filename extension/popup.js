@@ -76,7 +76,7 @@ async function poll() {
     return setTimeout(poll, 1500);
   }
   if (st.error) return say("Ошибка: " + st.error, "err");
-  say(`Готово. Пул ${st.pool}:`);
+  say(`Готово · пул ${st.pool}. Дубли — одной вакансией.`);
   const order = ["apply", "clarify", "skip"];                         // сначала то, что важно, затем остальное
   const rows = Object.entries(st.summary || {}).sort(([a], [b]) => (order.indexOf(a) + 9) % 9 - (order.indexOf(b) + 9) % 9);
   $("#stats").replaceChildren(...rows.map(([k, v]) => {
@@ -87,7 +87,8 @@ async function poll() {
   }));
   $("#stats").hidden = !rows.length;
   button("Ещё раз", () => location.reload());
-  button("Открыть карту", () => chrome.tabs.create({ url: API + "/" }), "main").focus();
+  const map = API + "/?" + new URLSearchParams({ pool: st.pool, batch: 1 });     // карта: только этот сбор, apply+clarify
+  button("Открыть карту", () => chrome.tabs.create({ url: map }), "main").focus();
 }
 
 main().catch(e => say("Ошибка: " + e.message, "err"));

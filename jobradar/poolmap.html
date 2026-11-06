@@ -3,89 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Карта вакансий</title>
+<title>Job Radar</title>
 <style>
+/* Минимализм, общий с попапом расширения: системный шрифт, тонкие серые линии, один акцент, решения — цветные точки. */
 :root {
-  --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e2dc; --grid: #ecebe6;
-  --apply: #1f8a5b; --clarify: #c98a12; --skip: #a8a8a2; --dup: #7d6bb3; --scam: #c0392b;
-  --accent: #2f5fd0; --zone: rgba(31, 138, 91, .07); --shadow: 0 1px 3px rgba(0,0,0,.08);
+  --bg: #ffffff; --panel: #ffffff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7; --grid: #f4f4f5;
+  --apply: #16a34a; --clarify: #d97706; --skip: #a1a1aa; --dup: #a1a1aa; --scam: #dc2626;
+  --accent: #2563eb; --zone: rgba(22, 163, 74, .06);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #34332f; --grid: #2a2a27;
-  --apply: #3cc48a; --clarify: #e3a93a; --skip: #6b6b66; --dup: #a593e0; --scam: #e8675a;
-  --accent: #7ea0ff; --zone: rgba(60, 196, 138, .09); --shadow: none;
+  --bg: #0f0f11; --panel: #0f0f11; --ink: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --grid: #18181b;
+  --apply: #22c55e; --clarify: #f59e0b; --skip: #52525b; --dup: #52525b; --scam: #ef4444;
+  --accent: #60a5fa; --zone: rgba(34, 197, 94, .07);
 }}
 :root[data-theme="dark"] {
-  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9a9993; --line: #34332f; --grid: #2a2a27;
-  --apply: #3cc48a; --clarify: #e3a93a; --skip: #6b6b66; --dup: #a593e0; --scam: #e8675a;
-  --accent: #7ea0ff; --zone: rgba(60, 196, 138, .09); --shadow: none;
+  --bg: #0f0f11; --panel: #0f0f11; --ink: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --grid: #18181b;
+  --apply: #22c55e; --clarify: #f59e0b; --skip: #52525b; --dup: #52525b; --scam: #ef4444;
+  --accent: #60a5fa; --zone: rgba(34, 197, 94, .07);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { padding: 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
-h1 { font-size: 18px; margin: 0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; }
+header { padding: 20px 24px 12px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; border-bottom: 1px solid var(--line); }
+h1 { font-size: 16px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; letter-spacing: -.01em; }
+h1 svg { width: 18px; height: 18px; color: var(--accent); }
 .muted { color: var(--muted); }
-.tabs { display: flex; gap: 4px; }
-.tabs button, .chip, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink);
-  border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
-.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.controls { padding: 0 16px 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.chip[aria-pressed="false"] { opacity: .45; }
-progress { width: 140px; height: 8px; vertical-align: middle; accent-color: var(--accent); }
+#meta { font-size: 13px; }
+.tabs { display: flex; gap: 2px; }
+.tabs button { border: 0; background: none; color: var(--muted); padding: 6px 10px; font: inherit; cursor: pointer;
+  border-bottom: 2px solid transparent; border-radius: 0; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.chip, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px;
+  padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.btn { border-radius: 6px; }
+.chip:hover, .btn:hover { border-color: var(--muted); }
+.btn.main { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.controls { padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip[aria-pressed="false"] { color: var(--muted); }
+.chip[aria-pressed="false"] i { opacity: .35; }
+.chip.batch { border-color: var(--accent); color: var(--accent); }
+progress { width: 140px; height: 4px; vertical-align: middle; accent-color: var(--accent); }
 #scan-log { margin-left: 8px; font-size: 12px; }
-.chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
-input[type=search] { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
-  padding: 5px 8px; font: inherit; min-width: 160px; }
-main { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; padding: 0 16px 24px; }
-@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.chip i, .dotc { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; flex: none; }
+input[type=search], select, .tools input { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px;
+  padding: 4px 10px; font: inherit; font-size: 13px; }
+input[type=search] { min-width: 200px; }
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+main { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 0 24px 24px; }
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); padding: 0 16px 16px; } header, .controls { padding-left: 16px; padding-right: 16px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .chart { padding: 8px; }
 svg { width: 100%; height: auto; display: block; }
 svg text { fill: var(--muted); font-size: 11px; }
 .dot { cursor: pointer; stroke: var(--panel); stroke-width: 1.5; }
-.dot.sel { stroke: var(--ink); stroke-width: 2.5; }
-.dot.star { stroke: var(--accent); stroke-width: 2.5; }
-.list { max-height: 420px; overflow: auto; border-top: 1px solid var(--line); }
-.row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; padding: 7px 10px;
+.dot.sel { stroke: var(--ink); stroke-width: 2; }
+.dot.star { stroke: var(--accent); stroke-width: 2; }
+.list { max-height: 460px; overflow: auto; border-top: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; padding: 9px 12px;
   border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+.row:last-child { border-bottom: 0; }
 .row:hover, .row.sel { background: var(--grid); }
-.row .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .n { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
-.star-btn { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 0; }
-.star-btn.on { color: var(--accent); }
-.detail { padding: 14px 16px; position: sticky; top: 8px; align-self: start; max-height: calc(100vh - 16px); overflow: auto; }
-.detail h2 { font-size: 16px; margin: 0 0 4px; }
-.kv { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; background: var(--grid); }
-.pill.d { color: #fff; }
-pre { white-space: pre-wrap; word-break: break-word; background: var(--grid); padding: 10px; border-radius: 8px;
-  font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 6px 0 0; }
+.row .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+.row .t b { font-weight: 500; margin-right: 4px; }
+.row .n { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; font-size: 12px; }
+.star-btn { border: 0; background: none; cursor: pointer; color: var(--line); font-size: 15px; padding: 0; }
+.row:hover .star-btn { color: var(--muted); }
+.star-btn.on, .row:hover .star-btn.on { color: var(--accent); }
+.detail { padding: 18px 20px; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 24px); overflow: auto; }
+.detail h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; letter-spacing: -.01em; }
+.detail > div { margin-top: 6px; }
+.kv { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.pill { border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; display: inline-flex; align-items: center; }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--grid); padding: 12px; border-radius: 6px;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 6px 0 0; }
 textarea { width: 100%; min-height: 220px; background: var(--grid); color: var(--ink); border: 1px solid var(--line);
-  border-radius: 8px; padding: 10px; font: 13px/1.45 ui-monospace, Menlo, monospace; }
-details { margin-top: 10px; }
-summary { cursor: pointer; font-weight: 600; }
-.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-a { color: var(--accent); }
-.short { padding: 10px 16px; }
-.empty { padding: 30px; text-align: center; color: var(--muted); }
-.tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-right: 6px; color: var(--muted); }
-.tag.new { color: var(--accent); border-color: var(--accent); }
-.tag.st { color: var(--apply); border-color: var(--apply); }
+  border-radius: 6px; padding: 12px; font: 13px/1.5 ui-monospace, Menlo, monospace; }
+details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+summary { cursor: pointer; font-weight: 500; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; align-items: center; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.short { padding: 14px 20px; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+.tag { display: inline-block; font-size: 11px; color: var(--muted); margin-right: 8px; white-space: nowrap; }
+.tag::after { content: " ·"; color: var(--line); }
+.tag.new { color: var(--accent); }
+.tag.st { color: var(--apply); }
 .row.gone { opacity: .5; }
-select, .tools input { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 4px 6px; font: inherit; }
 .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
-.tools input { min-width: 240px; }
+.tools input { min-width: 260px; }
 .skills { padding: 6px 8px; }
 .skills table { width: 100%; border-collapse: collapse; }
-.skills td, .skills th { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.skills th { font-weight: 600; color: var(--muted); font-size: 12px; }
-.skills h3 { font-size: 14px; margin: 12px 6px 4px; }
+.skills td, .skills th { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.skills th { font-weight: 500; color: var(--muted); font-size: 12px; }
+.skills h3 { font-size: 14px; font-weight: 600; margin: 14px 6px 4px; }
 .linkish { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Карта вакансий</h1>
+  <h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 18.4 5.6"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>Job Radar</h1>
   <span class="muted" id="meta"></span>
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="fit">Fit × Job</button>
@@ -102,7 +119,7 @@ select, .tools input { border: 1px solid var(--line); background: var(--panel); 
   </section>
   <aside class="card detail" id="detail"><div class="empty">Выбери точку или строку</div></aside>
 </main>
-<section class="card short" style="margin: 0 16px 24px" id="short"></section>
+<section class="card short" style="margin: 0 24px 24px" id="short"></section>
 
 <script>
 const DATA = /*DATA*/null;
@@ -113,7 +130,9 @@ const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? 
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const state = { tab: "fit", dec: new Set(["apply", "clarify"]), q: "", rateOk: false, city: null, sel: null,
                 mode: new Set(store.get("jr-mode", ["full", "hybrid", "none"])), gone: false, oldNo: false, sort: store.get("jr-sort", "dec"),
-                stars: new Set(store.get("jr-stars-" + DATA.date, [])) };
+                stars: new Set(store.get("jr-stars-" + DATA.date, [])),
+                batch: new URLSearchParams(location.search).has("batch") && DATA.batch.length > 0 };
+const BATCH = new Set(DATA.batch);
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const mid = r => r.rate ? (r.rate[0] + r.rate[1]) / 2 : null;
@@ -135,7 +154,7 @@ const fail = e => alert("Не получилось: " + e.message);
 
 function base(r) {           // все фильтры, кроме города
   const q = state.q.toLowerCase();
-  return state.dec.has(r.decision) && state.mode.has(mode(r)) && (state.gone || !r.gone) && (state.oldNo || !r.prev?.old_no)
+  return (!state.batch || BATCH.has(r.slug)) && state.dec.has(r.decision) && state.mode.has(mode(r)) && (state.gone || !r.gone) && (state.oldNo || !r.prev?.old_no)
     && (!q || (r.company + " " + r.role + " " + r.why).toLowerCase().includes(q))
     && (!state.rateOk || (r.rate && r.rate[1] >= TARGET_H));
 }
@@ -151,8 +170,10 @@ function visible() {
 }
 
 function controls() {
-  const n = d => DATA.rows.filter(r => r.decision === d).length;
-  $("#controls").innerHTML = Object.keys(DEC).filter(n).map(d =>
+  const pool = DATA.rows.filter(r => !state.batch || BATCH.has(r.slug)), n = d => pool.filter(r => r.decision === d).length;
+  $("#controls").innerHTML = (state.batch ? `<button class="chip batch" id="batch" title="показать весь пул">этот сбор · ${BATCH.size} ✕</button>`
+      : DATA.batch.length ? `<button class="chip" id="batch" title="только последний сбор расширением">последний сбор ${DATA.batch.length}</button>` : "")
+    + Object.keys(DEC).filter(n).map(d =>
     `<button class="chip" data-dec="${d}" aria-pressed="${state.dec.has(d)}"><i style="background:${DEC[d]}"></i>${DEC_RU[d]} ${n(d)}</button>`).join("")
     + ["full", "hybrid", "onsite", "none"].filter(m => DATA.rows.some(r => mode(r) === m)).map(m =>
       `<button class="chip" data-mode="${m}" aria-pressed="${state.mode.has(m)}">${MODE_RU[m]} ${DATA.rows.filter(r => mode(r) === m).length}</button>`).join("")
@@ -166,6 +187,10 @@ function controls() {
   document.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => {
     state.dec.has(b.dataset.dec) ? state.dec.delete(b.dataset.dec) : state.dec.add(b.dataset.dec); draw(); });
   $("#rate").onclick = () => { state.rateOk = !state.rateOk; draw(); };
+  if ($("#batch")) $("#batch").onclick = () => {
+    state.batch = !state.batch;
+    const u = new URL(location.href); state.batch ? u.searchParams.set("batch", "1") : u.searchParams.delete("batch");
+    history.replaceState(null, "", u); draw(); };
   document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
     state.mode.has(b.dataset.mode) ? state.mode.delete(b.dataset.mode) : state.mode.add(b.dataset.mode);
     store.set("jr-mode", [...state.mode]); draw(); });
@@ -239,7 +264,7 @@ function list(rows) {
   if (!rows.length) return `<div class="empty">Ничего не подходит под фильтры</div>`;
   return rows.map(r => `<div class="row ${state.sel === r.slug ? "sel" : ""} ${r.gone ? "gone" : ""}" data-slug="${r.slug}">
     <button class="star-btn ${state.stars.has(r.slug) ? "on" : ""}" data-star="${r.slug}" title="в шортлист">${state.stars.has(r.slug) ? "★" : "☆"}</button>
-    <div class="t">${r.manual !== null ? "✋ " : ""}<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DEC[r.decision]};margin-right:6px"></i>${tags(r)}<b>${esc(r.company)}</b> — ${esc(r.role)}</div>
+    <div class="t">${r.manual !== null ? "✋ " : ""}<i class="dotc" style="background:${DEC[r.decision]}"></i>${tags(r)}<b>${esc(r.company)}</b><span class="muted">${esc(r.role)}</span></div>
     <div class="n">fit ${r.fit} · job ${r.job ?? "н/д"} · ${rateTxt(r)}</div></div>`).join("");
 }
 
@@ -247,6 +272,7 @@ function tags(r) {
   return (r.new ? `<span class="tag new">новая</span>` : "") + (r.gone ? `<span class="tag">пропала</span>` : "")
     + (r.prev ? `<span class="tag" title="первый раз: ${esc(r.prev.first)}">было ${esc(r.prev.first.slice(5))}: ${esc(r.prev.status ? ST_RU[r.prev.status] : DEC_RU[r.prev.decision] || r.prev.decision)}</span>` : "")
     + (r.remote !== "full" && r.remote ? `<span class="tag">${MODE_RU[mode(r)]}${r.city && r.city !== DATA.home ? " " + esc(r.city) : ""}</span>` : "")
+    + (r.others.length ? `<span class="tag" title="${esc(r.cities.join(", "))}">+${r.others.length} ${r.cities.length > 1 ? "города" : "ссылки"}</span>` : "")
     + (r.taken ? `<span class="tag">в jobs: ${esc(r.taken)}</span>` : "") + (r.status ? `<span class="tag st">${ST_RU[r.status.status]}</span>` : "");
 }
 
@@ -260,8 +286,8 @@ function detail() {
   if (!r) { $("#detail").innerHTML = `<div class="empty">Выбери точку или строку</div>`; return; }
   const place = r.remote === "full" ? "remote" : `${r.remote}${r.onsite_days ? `, офис ${r.onsite_days} д/нед` : ""}`;
   $("#detail").innerHTML = `
-    <h2>${esc(r.role)}</h2><div><b>${esc(r.company)}</b> · ${esc(r.city || "?")} · ${esc(place)}${r.km != null && r.remote !== "full" ? ` · ${r.km} км от дома` : ""}</div>
-    <div class="kv"><span class="pill d" style="background:${DEC[r.decision]}">${DEC_RU[r.decision]}</span>
+    <h2>${esc(r.role)}</h2><div><b>${esc(r.company)}</b> · ${esc(r.cities.join(", ") || "?")} · ${esc(place)}${r.km != null && r.remote !== "full" ? ` · ${r.km} км от дома` : ""}</div>
+    <div class="kv"><span class="pill"><i class="dotc" style="background:${DEC[r.decision]}"></i>${DEC_RU[r.decision]}</span>
       <span class="pill">fit ${r.fit}</span><span class="pill">job ${r.job ?? "н/д"}</span><span class="pill">${rateTxt(r)}</span>
       ${r.rate ? `<span class="pill">≈ ${Math.round(r.rate[0] * 8)}–${Math.round(r.rate[1] * 8)} PLN/день</span>` : ""}</div>
     ${r.money_note ? `<div>💰 ${esc(r.money_note)}</div>` : ""}
@@ -278,7 +304,7 @@ function detail() {
     ${r.manual !== null ? `<div style="margin-top:6px">✋ <b>вручную</b> (скрипт: ${DEC_RU[r.auto]})${r.manual ? ": " + esc(r.manual) : ""}</div>` : ""}
     <div style="margin-top:6px" class="muted">Причина решения скрипта: ${esc(r.reason)}</div>
     <div class="actions">
-      <a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener">открыть вакансию</a>
+      <a class="btn main" href="${esc(r.url)}" target="_blank" rel="noopener">открыть вакансию</a>
       <button class="btn" id="cp-take">копировать: jr take</button>
       <button class="btn" id="cp-eval">копировать: /job-eval</button>
       <button class="btn" id="st">${state.stars.has(r.slug) ? "★ в шортлисте" : "☆ в шортлист"}</button>
@@ -287,6 +313,7 @@ function detail() {
       ${["apply", "clarify", "skip"].filter(d => d !== r.decision).map(d => `<button class="btn" data-move="${d}">→ ${DEC_RU[d]}</button>`).join("")}
       ${r.manual !== null ? `<button class="btn" data-move="auto">снять ручное</button>` : ""}
     </div>
+    ${r.others.length ? `<div class="muted">Та же вакансия ещё здесь: ${r.others.map(o => `<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.city || o.slug)}</a>`).join(", ")}</div>` : ""}
     ${r.call_notes.length ? `<details open><summary>Спросить на звонке</summary><ul>${r.call_notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
     ${r.reply ? `<details open><summary>Черновик ответа (шаблон ${esc(r.template)})</summary>
       <div class="muted">Места [...] дописывает /job-eval после research. Отправляешь сам.</div>
@@ -399,7 +426,7 @@ document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
 state.tab = ["#fit", "#geo", "#skills"].includes(location.hash) ? location.hash.slice(1) : store.get("jr-tab", "fit");
 store.set("jr-tab", null);
 document.querySelectorAll("[data-tab]").forEach(x => x.setAttribute("aria-selected", x.dataset.tab === state.tab));
-$("#meta").textContent = `пул ${DATA.date} · ${DATA.rows.length} вакансий · дом: ${DATA.home}` + (API ? " · jr serve" : "");
+$("#meta").textContent = `пул ${DATA.date} · ${DATA.rows.length} вакансий` + (DATA.hidden ? ` (дублей скрыто ${DATA.hidden})` : "") + ` · дом: ${DATA.home}`;
 const keep = store.get("jr-sel", null); store.set("jr-sel", null);
 state.sel = DATA.rows.some(r => r.slug === keep) ? keep : visible()[0]?.slug ?? null;
 tools();

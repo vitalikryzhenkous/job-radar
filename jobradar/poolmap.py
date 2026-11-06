@@ -15,7 +15,7 @@ import yaml
 from .config import load_profile
 from . import skills as skills_mod
 from .config import ROOT
-from .scan import POOL, match, why
+from .scan import POOL, match, pool_groups, why
 
 TEMPLATE = Path(__file__).with_name("poolmap.html")
 # (lon, lat) — только для схемы на вкладке «Города»
@@ -175,7 +175,29 @@ def rows(pool_dir: Path, profile: dict) -> list[dict]:
             "new": bool(before) and d.name not in before,
             "gone": scanned and seen is not None and d.name not in seen,     # нет в последнем скане сайта
         })
-    return out
+    return _merge_dups(pool_dir, out)
+
+
+def _merge_dups(pool_dir: Path, out: list[dict]) -> list[dict]:
+    """Дубли (та же компания+роль) прячутся в карточку: others — их slug/город/ссылка, cities — все города.
+    Файлы дублей не трогаем; dups — сколько спрятано (для шапки)."""
+    _, of = pool_groups(pool_dir)
+    alias: dict[str, list] = {}
+    for slug, c in sorted(of.items()):
+        if c != slug:
+            city, url = _raw_head(pool_dir / slug)
+            alias.setdefault(c, []).append({"slug": slug, "city": city, "url": url})
+    keep = [r for r in out if of.get(r["slug"], r["slug"]) == r["slug"]]
+    for r in keep:
+        r["others"] = alias.get(r["slug"], [])
+        r["cities"] = list(dict.fromkeys(x for x in [r["city"], *(o["city"] for o in r["others"])] if x))
+    return keep
+
+
+def batch(pool_dir: Path) -> list[str]:
+    """Карточки последнего сбора расширением (collect.json); [] — сборов не было."""
+    p = pool_dir / "collect.json"
+    return json.loads(p.read_text(encoding="utf-8"))["slugs"] if p.is_file() else []
 
 
 def rescore(pool_dir: Path, fx: dict, profile: dict, index_path: Path) -> int:
@@ -208,7 +230,8 @@ def data(pool_dir: Path | None = None, profile: dict | None = None) -> dict:
     return {"date": pool_dir.name, "home": ALIAS.get(home, home), "cities": CITY_XY,
             "pools": sorted((p.name for p in POOL.iterdir() if p.is_dir()), reverse=True) if POOL.is_dir() else [],
             "skills": skills_mod.listing(profile), "levels": skills_mod.LEVELS, "statuses": STATUSES,
-            "api": None, "rows": rs}
+            "api": None, "rows": rs, "batch": batch(pool_dir),
+            "hidden": sum(len(r["others"]) for r in rs)}
 
 
 def html(d: dict) -> str:

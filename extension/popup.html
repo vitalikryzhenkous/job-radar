@@ -1,65 +1,46 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <style>
-  /* Классический Mac OS (System 6/7) + 8-bit: чёрное на белом, окно с полосатым заголовком, рамки 1px без размытия,
-     прогресс-бар «шахматкой». Текст — системный шрифт 13px обычной толщины: читается; пиксели только в декоре. */
-  :root { --ink: #000; --paper: #fff; --gray: #c0c0c0; --muted: #555; --apply: #1f7a1f; --clarify: #a86b00;
-          --skip: #777; --err: #b00020; }
+  /* Минимализм, общий с картой (jobradar/poolmap.html): системный шрифт, тонкие серые линии, один акцент, решения — точки.
+     Светлая/тёмная — как в системе. */
+  :root { --bg: #fff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7; --grid: #f4f4f5; --accent: #2563eb;
+          --apply: #16a34a; --clarify: #d97706; --skip: #a1a1aa; --err: #dc2626; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f0f11; --ink: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --grid: #18181b; --accent: #60a5fa;
+            --apply: #22c55e; --clarify: #f59e0b; --skip: #52525b; --err: #ef4444; } }
   * { box-sizing: border-box; }
-  html { background: var(--gray); }
-  body { margin: 0; padding: 8px; width: 340px; background: var(--gray); color: var(--ink);
-         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-  .win { background: var(--paper); border: 1px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
-  /* заголовок окна: 6 полосок, кнопка закрытия слева, название в белой плашке */
-  .title { position: relative; height: 22px; margin: 0; border-bottom: 1px solid var(--ink); padding: 4px 3px;
-           background: repeating-linear-gradient(var(--ink) 0 1px, var(--paper) 1px 2px) content-box; }
-  .title .close { position: absolute; left: 9px; top: 5px; width: 13px; height: 12px; background: var(--paper);
-                  border: 1px solid var(--ink); box-shadow: 0 0 0 2px var(--paper); }
-  .title h1 { position: absolute; left: 50%; top: 2px; transform: translateX(-50%); margin: 0; padding: 0 8px;
-              background: var(--paper); font: bold 13px/18px ui-monospace, "Cascadia Mono", Consolas, monospace;
-              letter-spacing: .5px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-  .title img { width: 16px; height: 16px; image-rendering: pixelated; }
-  .body { padding: 12px 14px 14px; }
-  .sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  body { margin: 0; width: 320px; padding: 16px; background: var(--bg); color: var(--ink);
+         font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+  header img { width: 18px; height: 18px; }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+  header span { margin-left: auto; color: var(--muted); font-size: 12px; }
   #msg { margin: 0 0 12px; min-height: 20px; }
   #msg.err { color: var(--err); }
-  #msg.err::before { content: "⚠ "; }
-  /* итог: строки «решение ........ число» */
-  #stats { list-style: none; margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--ink); }
-  #stats li { display: flex; align-items: baseline; gap: 6px; padding: 2px 0; }
-  #stats li::before { content: ""; width: 8px; height: 8px; background: var(--c); flex: none; align-self: center; }
-  #stats .lbl { white-space: nowrap; }
-  #stats .dots { flex: 1; border-bottom: 1px dotted var(--muted); transform: translateY(-3px); }
-  #stats b { font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+  #stats { list-style: none; margin: 0 0 14px; padding: 0; border-top: 1px solid var(--line); }
+  #stats li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  #stats li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+  #stats .lbl { flex: 1; }
+  #stats b { font-weight: 600; font-variant-numeric: tabular-nums; }
   #stats .apply { --c: var(--apply); } #stats .clarify { --c: var(--clarify); } #stats .skip { --c: var(--skip); }
-  #stats .other { --c: var(--ink); }
-  /* кнопки как в System 7: скруглённый прямоугольник; основная — с толстой обводкой */
-  #actions { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; padding-top: 2px; }
-  button { min-width: 84px; padding: 4px 14px; border: 1px solid var(--ink); border-radius: 7px; background: var(--paper);
-           color: var(--ink); font: inherit; cursor: pointer; }
-  button.main { box-shadow: 0 0 0 2px var(--paper), 0 0 0 5px var(--ink); border-radius: 7px; margin: 4px; }
-  button:active { background: var(--ink); color: var(--paper); }
-  button:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
-  button:disabled { color: var(--skip); border-color: var(--skip); cursor: default; background: var(--paper); }
-  /* прогресс: чёрная рамка, заливка «шахматкой» 2×2 px — 8-bit */
-  #bar { height: 14px; margin: 0 0 12px; border: 1px solid var(--ink); padding: 1px; overflow: hidden; }
-  #fill { height: 100%; width: 0; transition: width .3s steps(5);
-          background: repeating-conic-gradient(var(--ink) 0 25%, var(--paper) 0 50%) 0 0 / 2px 2px; }
-  #bar.wait #fill { width: 25%; animation: scan 1.4s steps(14) infinite; }
-  @keyframes scan { from { margin-left: -25%; } to { margin-left: 100%; } }
-  .blink { animation: blink 1s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+  #stats .other { --c: var(--line); color: var(--muted); }
+  #actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  button { padding: 6px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink);
+           font: inherit; font-weight: 500; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.main { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: .45; cursor: default; }
+  #bar { height: 3px; margin: 0 0 12px; background: var(--grid); border-radius: 2px; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+  #bar.wait #fill { width: 30%; animation: scan 1.2s ease-in-out infinite; }
+  @keyframes scan { from { margin-left: -30%; } to { margin-left: 100%; } }
 </style></head>
 <body>
-  <div class="win">
-    <div class="title"><span class="close"></span><h1><img src="icons/icon32.png" alt="">Job Radar</h1></div>
-    <div class="body">
-      <p class="sub">Вакансии с этой страницы → оценка</p>
-      <div id="msg">Ищу вакансии<span class="blink">_</span></div>
-      <div id="bar" hidden><div id="fill"></div></div>
-      <ul id="stats" hidden></ul>
-      <div id="actions"></div>
-    </div>
-  </div>
+  <header><img src="icons/icon32.png" alt=""><h1>Job Radar</h1><span>страница → оценка</span></header>
+  <div id="msg">Ищу вакансии…</div>
+  <div id="bar" hidden><div id="fill"></div></div>
+  <ul id="stats" hidden></ul>
+  <div id="actions"></div>
   <script src="popup.js"></script>
 </body></html>
